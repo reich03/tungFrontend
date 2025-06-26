@@ -1,29 +1,64 @@
 {
   "expo": {
-    "name": "TungApp",
-    "slug": "TungApp",
+    "name": "TUNG",
+    "slug": "tung-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/logoTung.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tung.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "TUNG necesita acceso a tu ubicación para mostrarte eventos de fútbol cerca de ti.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "TUNG necesita acceso a tu ubicación para mostrarte eventos de fútbol cerca de ti.",
+        "NSCameraUsageDescription": "TUNG necesita acceso a la cámara para que puedas tomar fotos de perfil y de tus canchas.",
+        "NSPhotoLibraryUsageDescription": "TUNG necesita acceso a tu galería para que puedas seleccionar fotos de perfil y de tus canchas."
+      },
+      "config": {
+        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_API_KEY_IOS"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#30ce26"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.tung.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_ANDROID"
+        }
+      }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-location"
+    ],
+    "scheme": "tung",
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    },
+    "owner": "tung-team"
   }
 }
