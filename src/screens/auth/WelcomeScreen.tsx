@@ -15,7 +15,6 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
-// Paleta de colores consistente con las otras pantallas
 const BrandColors = {
   primaryGreen: "#30CE26",
   limeGreen: "#B3FE02",
@@ -34,7 +33,6 @@ const BrandColors = {
 const { width, height } = Dimensions.get("window");
 
 const WelcomeScreen = ({ navigation }: any) => {
-  // Animaciones
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUpAnim = useRef(new Animated.Value(50)).current;
   const logoScale = useRef(new Animated.Value(0.5)).current;
@@ -43,7 +41,6 @@ const WelcomeScreen = ({ navigation }: any) => {
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Animación de flotación continua para elementos decorativos
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, {
@@ -59,9 +56,7 @@ const WelcomeScreen = ({ navigation }: any) => {
       ])
     ).start();
 
-    // Secuencia principal de entrada
     Animated.sequence([
-      // Logo aparece primero
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -74,19 +69,16 @@ const WelcomeScreen = ({ navigation }: any) => {
           useNativeDriver: true,
         }),
       ]),
-      // Luego el contenido hero
       Animated.timing(heroSlide, {
         toValue: 0,
         duration: 600,
         useNativeDriver: true,
       }),
-      // Texto sube suavemente
       Animated.timing(slideUpAnim, {
         toValue: 0,
         duration: 500,
         useNativeDriver: true,
       }),
-      // Finalmente los botones
       Animated.timing(buttonSlide, {
         toValue: 0,
         duration: 400,
@@ -107,7 +99,6 @@ const WelcomeScreen = ({ navigation }: any) => {
         backgroundColor={BrandColors.background}
       />
 
-      {/* Elementos decorativos de fondo */}
       <View style={styles.backgroundElements}>
         <Animated.View
           style={[
@@ -143,7 +134,6 @@ const WelcomeScreen = ({ navigation }: any) => {
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo Section Mejorado */}
         <Animated.View
           style={[
             styles.header,
@@ -169,7 +159,6 @@ const WelcomeScreen = ({ navigation }: any) => {
           <Text style={styles.tagline}>Tu cancha. Tu juego. Tu momento.</Text>
         </Animated.View>
 
-        {/* Hero Section Rediseñado */}
         <Animated.View
           style={[
             styles.heroSection,
@@ -179,13 +168,11 @@ const WelcomeScreen = ({ navigation }: any) => {
             },
           ]}
         >
-          {/* Ilustración de fútbol creativa */}
           <View style={styles.heroIllustration}>
             <LinearGradient
               colors={[BrandColors.blue + '20', BrandColors.primaryGreen + '20']}
               style={styles.heroBackground}
             >
-              {/* Campo de fútbol estilizado */}
               <View style={styles.footballField}>
                 <View style={styles.fieldLine} />
                 <View style={styles.centerCircle} />
@@ -193,7 +180,6 @@ const WelcomeScreen = ({ navigation }: any) => {
                 <View style={[styles.goalArea, styles.rightGoal]} />
               </View>
               
-              {/* Iconos flotantes */}
               <View style={styles.floatingIcons}>
                 <Animated.View
                   style={[
@@ -251,7 +237,6 @@ const WelcomeScreen = ({ navigation }: any) => {
           </View>*/}
         </Animated.View>
 
-        {/* Textos principales */}
         <Animated.View
           style={[
             styles.textContainer,
@@ -270,7 +255,6 @@ const WelcomeScreen = ({ navigation }: any) => {
             para crear experiencias de fútbol inolvidables ⚽
           </Text>
 
-          {/* Features destacadas */}
           <View style={styles.featuresContainer}>
             <View style={styles.feature}>
               <View style={[styles.featureIcon, { backgroundColor: BrandColors.primaryGreen + '20' }]}>
@@ -294,7 +278,6 @@ const WelcomeScreen = ({ navigation }: any) => {
         </Animated.View>
       </ScrollView>
 
-      {/* Botones CTA mejorados */}
       <Animated.View
         style={[
           styles.ctaContainer,
@@ -403,7 +386,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 80,
     height: 40,
-    tintColor: BrandColors.primaryGreen, // Esto le dará color al logo si es un PNG transparente
+    tintColor: BrandColors.primaryGreen, 
   },
   tagline: {
     fontSize: 12,

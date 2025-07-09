@@ -13,7 +13,7 @@ import HostDashboardScreen from "../screens/host/HostDashboardScreen";
 import EventDetailsScreen from "../screens/shared/EventDetailsScreen";
 import JoinEventScreen from "../screens/player/JoinEventScreen";
 import ChallengesScreen from "../screens/player/ChallengesScreen";
-
+import PlayerEventsScreen from "@/screens/player/PlayerEvents";
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createStackNavigator<HomeStackParamList>();
 
@@ -29,7 +29,9 @@ const HomeStackNavigator = () => {
 
 const MainTabNavigator: React.FC = () => {
   const { user } = useAuth();
-  const isHost = user?.userType === "host";
+  
+  const isHost = user?.userType === "host" || user?.rolNombre === "ANFITRION";
+  const isPlayer = user?.userType === "player" || user?.rolNombre === "JUGADOR";
 
   return (
     <Tab.Navigator
@@ -50,6 +52,9 @@ const MainTabNavigator: React.FC = () => {
               break;
             case "HostDashboard":
               iconName = focused ? "business" : "business-outline";
+              break;
+            case "Challenges":
+              iconName = focused ? "trophy" : "trophy-outline";
               break;
             default:
               iconName = "help-outline";
@@ -79,13 +84,15 @@ const MainTabNavigator: React.FC = () => {
           tabBarLabel: "Mapa",
         }}
       />
+
       <Tab.Screen
         name="Events"
-        component={EventsScreen}
+        component={PlayerEventsScreen}
         options={{
           tabBarLabel: "Eventos",
         }}
       />
+
       {isHost && (
         <Tab.Screen
           name="HostDashboard"
@@ -95,18 +102,17 @@ const MainTabNavigator: React.FC = () => {
           }}
         />
       )}
-      {user?.userType === "player" && (
+
+      {isPlayer && (
         <Tab.Screen
           name="Challenges"
           component={ChallengesScreen}
           options={{
             tabBarLabel: "Retos",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="trophy-outline" size={size} color={color} />
-            ),
           }}
         />
       )}
+
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}

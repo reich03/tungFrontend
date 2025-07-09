@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,135 +9,43 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
-} from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RouteProp } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+  Alert,
+  RefreshControl,
+} from "react-native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RouteProp } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
-import { HomeStackParamList, Event, EventParticipant, PlayerPosition } from '../../types';
-import { Colors, Gradients } from '../../constants/Colors';
-import { useAuth } from '../../context/AuthContext';
-import CustomButton from '../../components/common/CustomButton';
+import { HomeStackParamList } from "../../types";
+import { Colors, Gradients } from "../../constants/Colors";
+import { useAuth } from "../../context/AuthContext";
+import CustomButton from "../../components/common/CustomButton";
+import playerEventService from "../../services/playerEventService";
+import { EventForFrontend, getPositionType } from "../../types/eventTypes";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
-type EventDetailsScreenNavigationProp = StackNavigationProp<HomeStackParamList, 'EventDetails'>;
-type EventDetailsScreenRouteProp = RouteProp<HomeStackParamList, 'EventDetails'>;
+type EventDetailsScreenNavigationProp = StackNavigationProp<
+  HomeStackParamList,
+  "EventDetails"
+>;
+type EventDetailsScreenRouteProp = RouteProp<
+  HomeStackParamList,
+  "EventDetails"
+>;
 
 interface Props {
   navigation: EventDetailsScreenNavigationProp;
   route: EventDetailsScreenRouteProp;
 }
 
-// Mock data expandida para el evento
-const mockEventDetails: Event = {
-  id: '1',
-  hostId: '1',
-  host: {
-    id: '1',
-    email: 'cancha@ejemplo.com',
-    fullName: 'Cancha El Estadio',
-    phone: '+57 300 123 4567',
-    userType: 'host',
-    isActive: true,
-    createdAt: '2025-01-01',
-    businessName: 'Cancha El Estadio',
-    address: 'Calle 72 #15-30, Barranquilla',
-    coordinates: {
-      latitude: 10.9878,
-      longitude: -74.7889,
-    },
-    description: 'La mejor cancha sintética de Barranquilla con todas las comodidades',
-    fields: [],
-    rating: 4.5,
-    totalReviews: 120,
-    businessHours: {},
-    contactInfo: {
-      whatsapp: '+57 300 123 4567',
-      instagram: '@cancha_estadio',
-    },
-  },
-  fieldId: '1',
-  field: {
-    id: '1',
-    name: 'Cancha Principal',
-    type: 'futbol7',
-    capacity: 14,
-    pricePerHour: 50000,
-    hasLighting: true,
-    isIndoor: false,
-    amenities: ['Baños', 'Parqueadero', 'Cafetería', 'Vestuarios', 'Duchas'],
-    images: [],
-    isActive: true,
-  },
-  title: 'Fútbol 7 - Viernes en la tarde',
-  description: 'Partido amistoso nivel intermedio. Buscamos completar el equipo para un buen juego. Todos los niveles bienvenidos, ambiente familiar y competitivo.',
-  date: '2025-06-14',
-  startTime: '18:00',
-  endTime: '19:30',
-  duration: 90,
-  maxPlayers: 14,
-  currentPlayers: 8,
-  pricePerPlayer: 7000,
-  status: 'open',
-  participants: [
-    {
-      playerId: '1',
-      player: {
-        id: '1',
-        email: 'juan@test.com',
-        fullName: 'Juan Pérez',
-        phone: '+57 300 111 1111',
-        userType: 'player',
-        isActive: true,
-        createdAt: '2025-01-01',
-        position: 'midfielder',
-        stats: { pace: 75, shooting: 70, passing: 85, dribbling: 80, defending: 60, physical: 75 },
-        preferredFoot: 'right',
-        experience: 'intermediate',
-        height: 175,
-        weight: 70,
-      },
-      position: 'midfielder',
-      joinedAt: '2025-06-14T10:00:00Z',
-      status: 'confirmed',
-    },
-    {
-      playerId: '2',
-      player: {
-        id: '2',
-        email: 'carlos@test.com',
-        fullName: 'Carlos González',
-        phone: '+57 300 222 2222',
-        userType: 'player',
-        isActive: true,
-        createdAt: '2025-01-01',
-        position: 'forward',
-        stats: { pace: 85, shooting: 90, passing: 70, dribbling: 85, defending: 50, physical: 80 },
-        preferredFoot: 'left',
-        experience: 'advanced',
-        height: 180,
-        weight: 75,
-      },
-      position: 'forward',
-      joinedAt: '2025-06-14T11:00:00Z',
-      status: 'confirmed',
-    },
-  ],
-  requirements: {
-    minExperience: 'beginner',
-    maxAge: 40,
-    minAge: 16,
-  },
-  createdAt: '2025-06-14',
-};
-
 const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const { user } = useAuth();
   const { eventId } = route.params;
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<EventForFrontend | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadEventDetails();
@@ -146,97 +54,76 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const loadEventDetails = async () => {
     try {
       setLoading(true);
-      // Simular carga de API
-      setTimeout(() => {
-        setEvent(mockEventDetails);
-        setLoading(false);
-      }, 500);
+      const result = await playerEventService.getEventDetails(eventId);
+
+      if (result.success && result.data) {
+        setEvent(result.data);
+      } else {
+        Alert.alert("Error", result.message);
+        navigation.goBack();
+      }
     } catch (error) {
-      console.error('Error loading event details:', error);
+      console.error("Error loading event details:", error);
+      Alert.alert("Error", "No se pudieron cargar los detalles del evento");
+      navigation.goBack();
+    } finally {
       setLoading(false);
     }
   };
 
-  const getPositionEmoji = (position: PlayerPosition): string => {
-    switch (position) {
-      case 'goalkeeper': return '🥅';
-      case 'defender': return '🛡️';
-      case 'midfielder': return '⚡';
-      case 'forward': return '⚽';
-      default: return '👤';
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadEventDetails();
+    setRefreshing(false);
+  };
+
+  const getPositionDisplayName = (positionName: string): string => {
+    const type = getPositionType(positionName);
+    const teamLetter = positionName.includes("A") ? "A" : "B";
+    const number = positionName.match(/\d+/)?.[0] || "";
+
+    return `${type} ${teamLetter}${number ? number : ""}`;
+  };
+
+  const getPositionEmoji = (positionName: string): string => {
+    const type = getPositionType(positionName);
+    switch (type) {
+      case "Arquero":
+        return "🥅";
+      case "Defensa":
+        return "🛡️";
+      case "Mediocampo":
+        return "⚡";
+      case "Delantero":
+        return "⚽";
+      default:
+        return "👤";
     }
   };
 
-  const getPositionName = (position: PlayerPosition): string => {
-    switch (position) {
-      case 'goalkeeper': return 'Arquero';
-      case 'defender': return 'Defensa';
-      case 'midfielder': return 'Medio';
-      case 'forward': return 'Delantero';
-      default: return 'Jugador';
-    }
-  };
-
-  const getExperienceLevel = (experience: string): string => {
-    switch (experience) {
-      case 'beginner': return 'Principiante';
-      case 'intermediate': return 'Intermedio';
-      case 'advanced': return 'Avanzado';
-      case 'professional': return 'Profesional';
-      default: return experience;
-    }
-  };
-
-  const isUserJoined = event?.participants.some(p => p.playerId === user?.id) || false;
-  const canJoin = event?.status === 'open' && event.currentPlayers < event.maxPlayers && !isUserJoined;
+  const isUserJoined =
+    event?.positions.some((p) => p.jugadorId === user?.id) || false;
+  const canJoin =
+    event?.status === "available" && event.availableSpaces > 0 && !isUserJoined;
 
   if (loading || !event) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
         <View style={styles.loadingContainer}>
-          <Text>Cargando evento...</Text>
+          <Text style={styles.loadingText}>Cargando evento...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const ParticipantCard: React.FC<{ participant: EventParticipant }> = ({ participant }) => (
-    <View style={styles.participantCard}>
-      <View style={styles.participantAvatar}>
-        <Text style={styles.participantInitials}>
-          {participant.player.fullName.split(' ').map(n => n[0]).join('')}
-        </Text>
-      </View>
-      <View style={styles.participantInfo}>
-        <Text style={styles.participantName}>{participant.player.fullName}</Text>
-        <View style={styles.participantDetails}>
-          <Text style={styles.participantPosition}>
-            {getPositionEmoji(participant.position)} {getPositionName(participant.position)}
-          </Text>
-          <Text style={styles.participantExperience}>
-            {getExperienceLevel(participant.player.experience)}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.participantStats}>
-        <View style={styles.statBadge}>
-          <Text style={styles.statValue}>
-            {Math.round((participant.player.stats.pace + participant.player.stats.shooting + 
-                        participant.player.stats.passing + participant.player.stats.dribbling + 
-                        participant.player.stats.defending + participant.player.stats.physical) / 6)}
-          </Text>
-          <Text style={styles.statLabel}>OVR</Text>
-        </View>
-      </View>
-    </View>
-  );
+  const occupiedPositions = event.positions.filter((p) => p.ocupada);
+  const availablePositions = event.positions.filter((p) => !p.ocupada);
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-      
-      {/* Header */}
+
       <LinearGradient
         colors={Gradients.primary}
         style={styles.header}
@@ -251,190 +138,382 @@ const EventDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           >
             <Ionicons name="arrow-back" size={24} color={Colors.textLight} />
           </TouchableOpacity>
-          
+
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerButton} activeOpacity={0.7}>
-              <Ionicons name="share-outline" size={24} color={Colors.textLight} />
+              <Ionicons
+                name="share-outline"
+                size={24}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerButton} activeOpacity={0.7}>
-              <Ionicons name="heart-outline" size={24} color={Colors.textLight} />
+              <Ionicons
+                name="heart-outline"
+                size={24}
+                color={Colors.textLight}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={handleRefresh}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="refresh-outline"
+                size={24}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
           </View>
         </View>
-        
+
         <View style={styles.eventHeader}>
           <Text style={styles.eventTitle}>{event.title}</Text>
-          <Text style={styles.eventHost}>{event.host.businessName}</Text>
-          
+          <Text style={styles.eventHost}>
+            {event.fieldInfo?.businessName || event.fieldName}
+          </Text>
+
           <View style={styles.eventMeta}>
             <View style={styles.metaItem}>
-              <Ionicons name="calendar-outline" size={16} color={Colors.textLight} />
-              <Text style={styles.metaText}>Viernes 14 Jun</Text>
+              <Ionicons
+                name="calendar-outline"
+                size={16}
+                color={Colors.textLight}
+              />
+              <Text style={styles.metaText}>
+                {new Date(event.date).toLocaleDateString("es-ES", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                })}
+              </Text>
             </View>
             <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={16} color={Colors.textLight} />
-              <Text style={styles.metaText}>{event.startTime} - {event.endTime}</Text>
+              <Ionicons
+                name="time-outline"
+                size={16}
+                color={Colors.textLight}
+              />
+              <Text style={styles.metaText}>{event.time}</Text>
             </View>
             <View style={styles.metaItem}>
-              <Ionicons name="people-outline" size={16} color={Colors.textLight} />
-              <Text style={styles.metaText}>{event.currentPlayers}/{event.maxPlayers}</Text>
+              <Ionicons
+                name="people-outline"
+                size={16}
+                color={Colors.textLight}
+              />
+              <Text style={styles.metaText}>
+                {event.registeredPlayers}/{event.maxPlayers}
+              </Text>
             </View>
           </View>
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Quick Info */}
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+      >
         <View style={styles.quickInfo}>
           <View style={styles.infoCard}>
             <Ionicons name="cash-outline" size={24} color={Colors.primary} />
-            <Text style={styles.infoValue}>${event.pricePerPlayer.toLocaleString()}</Text>
+            <Text style={styles.infoValue}>
+              ${event.fieldInfo?.pricePerPlayer?.toLocaleString() || "N/A"}
+            </Text>
             <Text style={styles.infoLabel}>Por jugador</Text>
           </View>
-          
+
           <View style={styles.infoCard}>
-            <Ionicons name="football-outline" size={24} color={Colors.primary} />
-            <Text style={styles.infoValue}>{event.field.type.replace('futbol', 'F')}</Text>
+            <Ionicons
+              name="football-outline"
+              size={24}
+              color={Colors.primary}
+            />
+            <Text style={styles.infoValue}>
+              {event.fieldType.replace("futbol", "F")}
+            </Text>
             <Text style={styles.infoLabel}>Tipo de cancha</Text>
           </View>
-          
+
           <View style={styles.infoCard}>
             <Ionicons name="star-outline" size={24} color={Colors.primary} />
-            <Text style={styles.infoValue}>{event.host.rating}</Text>
+            <Text style={styles.infoValue}>
+              {event.fieldInfo?.rating?.toFixed(1) || "N/A"}
+            </Text>
             <Text style={styles.infoLabel}>Calificación</Text>
           </View>
-        </View>
 
-        {/* Description */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Descripción</Text>
-          <Text style={styles.description}>{event.description}</Text>
-        </View>
-
-        {/* Field Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información de la cancha</Text>
-          
-          <View style={styles.fieldInfo}>
-            <View style={styles.fieldDetail}>
-              <Ionicons name="location-outline" size={20} color={Colors.primary} />
-              <Text style={styles.fieldDetailText}>{event.host.address}</Text>
-            </View>
-            
-            <View style={styles.amenitiesContainer}>
-              {event.field.amenities.map((amenity, index) => (
-                <View key={index} style={styles.amenityBadge}>
-                  <Text style={styles.amenityText}>{amenity}</Text>
-                </View>
-              ))}
-            </View>
-            
-            <View style={styles.fieldFeatures}>
-              {event.field.hasLighting && (
-                <View style={styles.feature}>
-                  <Ionicons name="bulb-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.featureText}>Iluminación</Text>
-                </View>
-              )}
-              {event.field.isIndoor && (
-                <View style={styles.feature}>
-                  <Ionicons name="home-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.featureText}>Techada</Text>
-                </View>
-              )}
-            </View>
+          <View style={styles.infoCard}>
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={24}
+              color={Colors.success}
+            />
+            <Text style={styles.infoValue}>{event.availableSpaces}</Text>
+            <Text style={styles.infoLabel}>Disponibles</Text>
           </View>
         </View>
 
-        {/* Requirements */}
-        {event.requirements && (
+        {event.fieldInfo?.photos && event.fieldInfo.photos.length > 0 && (
+          <View style={styles.photosSection}>
+            <Text style={styles.sectionTitle}>Fotos del establecimiento</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.photosScroll}
+            >
+              {event.fieldInfo.photos.map((photo, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: photo }}
+                  style={styles.photo}
+                  resizeMode="cover"
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Información del lugar</Text>
+
+          <View style={styles.fieldInfo}>
+            <View style={styles.fieldDetail}>
+              <Ionicons
+                name="location-outline"
+                size={20}
+                color={Colors.primary}
+              />
+              <Text style={styles.fieldDetailText}>
+                {event.fieldInfo?.address || "Dirección no disponible"}
+              </Text>
+            </View>
+
+            <View style={styles.fieldDetail}>
+              <Ionicons name="call-outline" size={20} color={Colors.primary} />
+              <Text style={styles.fieldDetailText}>
+                {event.fieldInfo?.phone || "Teléfono no disponible"}
+              </Text>
+            </View>
+
+            <View style={styles.fieldDetail}>
+              <Ionicons name="time-outline" size={20} color={Colors.primary} />
+              <Text style={styles.fieldDetailText}>
+                {event.fieldInfo?.openTime || "06:00"} -{" "}
+                {event.fieldInfo?.closeTime || "22:00"}
+              </Text>
+            </View>
+
+            {event.fieldInfo?.isVerified && (
+              <View style={styles.fieldDetail}>
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={20}
+                  color={Colors.success}
+                />
+                <Text
+                  style={[styles.fieldDetailText, { color: Colors.success }]}
+                >
+                  Establecimiento verificado
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {event.fieldInfo && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Requisitos</Text>
-            <View style={styles.requirements}>
-              {event.requirements.minExperience && (
-                <View style={styles.requirement}>
-                  <Ionicons name="trophy-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.requirementText}>
-                    Nivel mínimo: {getExperienceLevel(event.requirements.minExperience)}
-                  </Text>
-                </View>
-              )}
-              {event.requirements.minAge && event.requirements.maxAge && (
-                <View style={styles.requirement}>
-                  <Ionicons name="person-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.requirementText}>
-                    Edad: {event.requirements.minAge} - {event.requirements.maxAge} años
-                  </Text>
-                </View>
-              )}
+            <Text style={styles.sectionTitle}>Administrador</Text>
+
+            <View style={styles.ownerCard}>
+              <View style={styles.ownerAvatar}>
+                {event.fieldInfo.ownerAvatar ? (
+                  <Image
+                    source={{ uri: event.fieldInfo.ownerAvatar }}
+                    style={styles.ownerAvatarImage}
+                  />
+                ) : (
+                  <Ionicons name="person" size={24} color={Colors.textLight} />
+                )}
+              </View>
+              <View style={styles.ownerInfo}>
+                <Text style={styles.ownerName}>
+                  {event.fieldInfo.ownerName}
+                </Text>
+                <Text style={styles.ownerRole}>Propietario</Text>
+              </View>
+              <View style={styles.ownerRating}>
+                <Ionicons name="star" size={16} color={Colors.warning} />
+                <Text style={styles.ownerRatingText}>
+                  {event.fieldInfo.rating?.toFixed(1) || "N/A"}
+                </Text>
+              </View>
             </View>
           </View>
         )}
 
-        {/* Participants */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Jugadores confirmados</Text>
             <Text style={styles.participantsCount}>
-              {event.participants.length} de {event.maxPlayers}
+              {event.registeredPlayers} de {event.maxPlayers}
             </Text>
           </View>
-          
-          <View style={styles.participantsList}>
-            {event.participants.map((participant) => (
-              <ParticipantCard key={participant.playerId} participant={participant} />
-            ))}
-            
-            {/* Empty slots */}
-            {Array.from({ length: event.maxPlayers - event.currentPlayers }).map((_, index) => (
-              <View key={`empty-${index}`} style={styles.emptySlot}>
-                <View style={styles.emptySlotIcon}>
-                  <Ionicons name="add" size={24} color={Colors.textMuted} />
+
+          {occupiedPositions.length > 0 && (
+            <View style={styles.playersList}>
+              <Text style={styles.playersSubtitle}>Posiciones ocupadas</Text>
+              {occupiedPositions.map((position) => (
+                <View key={position.id} style={styles.playerCard}>
+                  <View style={styles.playerAvatar}>
+                    <Text style={styles.playerEmoji}>
+                      {getPositionEmoji(position.nombre)}
+                    </Text>
+                  </View>
+                  <View style={styles.playerInfo}>
+                    <Text style={styles.playerName}>
+                      {position.nombreJugador || "Jugador"}
+                    </Text>
+                    <Text style={styles.playerPosition}>
+                      {getPositionDisplayName(position.nombre)}
+                    </Text>
+                  </View>
+                  <View style={styles.playerStatus}>
+                    <View style={styles.statusBadge}>
+                      <Ionicons name="checkmark" size={12} color="white" />
+                      <Text style={styles.statusText}>Confirmado</Text>
+                    </View>
+                  </View>
                 </View>
-                <Text style={styles.emptySlotText}>Lugar disponible</Text>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
+
+          {availablePositions.length > 0 && (
+            <View style={styles.playersList}>
+              <Text style={styles.playersSubtitle}>
+                Posiciones disponibles ({availablePositions.length})
+              </Text>
+              {availablePositions.slice(0, 5).map((position) => (
+                <View
+                  key={position.id}
+                  style={[styles.playerCard, styles.availablePlayerCard]}
+                >
+                  <View
+                    style={[styles.playerAvatar, styles.availablePlayerAvatar]}
+                  >
+                    <Text style={styles.playerEmoji}>
+                      {getPositionEmoji(position.nombre)}
+                    </Text>
+                  </View>
+                  <View style={styles.playerInfo}>
+                    <Text style={styles.availablePlayerName}>
+                      {getPositionDisplayName(position.nombre)}
+                    </Text>
+                    <Text style={styles.availablePlayerText}>
+                      Posición libre
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name="add-circle-outline"
+                    size={24}
+                    color={Colors.primary}
+                  />
+                </View>
+              ))}
+
+              {availablePositions.length > 5 && (
+                <Text style={styles.morePositionsText}>
+                  +{availablePositions.length - 5} posiciones más disponibles
+                </Text>
+              )}
+            </View>
+          )}
         </View>
 
-        {/* Host Contact */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contacto</Text>
-          
-          <View style={styles.contactInfo}>
-            <View style={styles.contactItem}>
-              <Ionicons name="call-outline" size={20} color={Colors.primary} />
-              <Text style={styles.contactText}>{event.host.phone}</Text>
+          <Text style={styles.sectionTitle}>Estado del partido</Text>
+
+          <View style={styles.statusCard}>
+            <View style={styles.statusInfo}>
+              <Text style={styles.statusValue}>
+                {Math.round((event.registeredPlayers / event.maxPlayers) * 100)}
+                %
+              </Text>
+              <Text style={styles.statusLabel}>Completado</Text>
             </View>
-            
-            {event.host.contactInfo.whatsapp && (
-              <TouchableOpacity style={styles.contactButton} activeOpacity={0.7}>
-                <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
-                <Text style={styles.contactButtonText}>WhatsApp</Text>
-              </TouchableOpacity>
-            )}
-            
-            {event.host.contactInfo.instagram && (
-              <TouchableOpacity style={styles.contactButton} activeOpacity={0.7}>
-                <Ionicons name="logo-instagram" size={20} color="#E4405F" />
-                <Text style={styles.contactButtonText}>Instagram</Text>
-              </TouchableOpacity>
-            )}
+
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${
+                      (event.registeredPlayers / event.maxPlayers) * 100
+                    }%`,
+                  },
+                ]}
+              />
+            </View>
+
+            <Text style={styles.statusDescription}>
+              {event.availableSpaces === 0
+                ? "¡Partido completo! 🎉"
+                : `Faltan ${event.availableSpaces} jugadores para completar`}
+            </Text>
           </View>
         </View>
       </ScrollView>
 
-      {/* Join Button */}
-      {user?.userType === 'player' && (
+      {user?.userType === "player" && (
         <View style={styles.joinContainer}>
           <CustomButton
-            title={isUserJoined ? "Ya estás inscrito" : canJoin ? "Unirse al partido" : "Partido completo"}
-            onPress={() => canJoin && navigation.navigate('JoinEvent', { eventId: event.id })}
+            title={
+              isUserJoined
+                ? "Ya estás inscrito ✅"
+                : canJoin
+                ? "Unirse al partido"
+                : event.availableSpaces === 0
+                ? "Partido completo"
+                : "No disponible"
+            }
+            onPress={() => {
+              if (canJoin) {
+                navigation.navigate("JoinEvent", { eventId: event.id });
+              }
+            }}
             disabled={!canJoin}
             fullWidth
-            icon={isUserJoined ? "checkmark-circle" : canJoin ? "add-circle" : "close-circle"}
-            style={styles.joinButton}
+            icon={
+              isUserJoined
+                ? "checkmark-circle"
+                : canJoin
+                ? "add-circle"
+                : "close-circle"
+            }
+            style={[
+              styles.joinButton,
+              isUserJoined && styles.joinedButton,
+              !canJoin && !isUserJoined && styles.disabledButton,
+            ]}
           />
+
+          {!isUserJoined && (
+            <Text style={styles.priceInfo}>
+              Costo: $
+              {event.fieldInfo?.pricePerPlayer?.toLocaleString() || "N/A"} por
+              jugador
+            </Text>
+          )}
         </View>
       )}
     </SafeAreaView>
@@ -448,8 +527,12 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
   },
   header: {
     paddingTop: 16,
@@ -457,41 +540,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
+    marginTop: 20,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    top: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
-    top: 20,
   },
   headerButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   eventHeader: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   eventTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.textLight,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 8,
   },
   eventHost: {
@@ -501,14 +583,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   eventMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     gap: 16,
   },
   metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   metaText: {
@@ -520,30 +602,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   quickInfo: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 20,
     paddingVertical: 20,
-    gap: 12,
+    gap: 8,
   },
   infoCard: {
     flex: 1,
     backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
   },
   infoValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: "bold",
     color: Colors.textPrimary,
     marginTop: 8,
     marginBottom: 4,
   },
   infoLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.textSecondary,
+    textAlign: "center",
+  },
+  photosSection: {
+    paddingVertical: 16,
+  },
+  photosScroll: {
+    paddingLeft: 20,
+  },
+  photo: {
+    width: 120,
+    height: 80,
+    borderRadius: 12,
+    marginRight: 12,
   },
   section: {
     paddingHorizontal: 20,
@@ -552,197 +647,204 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.divider,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.textPrimary,
     marginBottom: 12,
-  },
-  description: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    lineHeight: 24,
   },
   fieldInfo: {
     gap: 16,
   },
   fieldDetail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   fieldDetailText: {
     fontSize: 16,
     color: Colors.textSecondary,
     flex: 1,
   },
-  amenitiesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  ownerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
-  amenityBadge: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  ownerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
-  amenityText: {
-    fontSize: 12,
-    color: Colors.primary,
-    fontWeight: '500',
+  ownerAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
-  fieldFeatures: {
-    flexDirection: 'row',
-    gap: 16,
+  ownerInfo: {
+    flex: 1,
   },
-  feature: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  ownerName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
   },
-  featureText: {
+  ownerRole: {
     fontSize: 14,
     color: Colors.textSecondary,
   },
-  requirements: {
-    gap: 12,
+  ownerRating: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
-  requirement: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  requirementText: {
-    fontSize: 16,
-    color: Colors.textSecondary,
+  ownerRatingText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: Colors.textPrimary,
   },
   participantsCount: {
     fontSize: 14,
     color: Colors.textMuted,
   },
-  participantsList: {
+  playersList: {
     gap: 12,
+    marginBottom: 16,
   },
-  participantCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  playersSubtitle: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  playerCard: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  participantAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  availablePlayerCard: {
+    borderStyle: "dashed",
+    backgroundColor: Colors.background,
+  },
+  playerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
-  participantInitials: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.textLight,
+  availablePlayerAvatar: {
+    backgroundColor: Colors.divider,
   },
-  participantInfo: {
+  playerEmoji: {
+    fontSize: 18,
+  },
+  playerInfo: {
     flex: 1,
   },
-  participantName: {
+  playerName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
-  participantDetails: {
-    flexDirection: 'row',
-    gap: 12,
+  availablePlayerName: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: Colors.textSecondary,
+    marginBottom: 2,
   },
-  participantPosition: {
+  playerPosition: {
     fontSize: 12,
     color: Colors.primary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
-  participantExperience: {
+  availablePlayerText: {
     fontSize: 12,
     color: Colors.textMuted,
+    fontStyle: "italic",
   },
-  participantStats: {
-    alignItems: 'center',
+  playerStatus: {
+    alignItems: "center",
   },
-  statBadge: {
-    backgroundColor: Colors.secondary,
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.success,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    alignItems: 'center',
+    gap: 4,
   },
-  statValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-  },
-  statLabel: {
+  statusText: {
     fontSize: 10,
-    color: Colors.textSecondary,
+    fontWeight: "600",
+    color: "white",
   },
-  emptySlot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderStyle: 'dashed',
-  },
-  emptySlotIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.divider,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  emptySlotText: {
-    fontSize: 16,
-    color: Colors.textMuted,
-    fontStyle: 'italic',
-  },
-  contactInfo: {
-    gap: 12,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  contactText: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-  },
-  contactButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 8,
-    padding: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  contactButtonText: {
+  morePositionsText: {
     fontSize: 14,
-    color: Colors.textPrimary,
-    fontWeight: '500',
+    color: Colors.primary,
+    textAlign: "center",
+    fontStyle: "italic",
+    marginTop: 8,
+  },
+  statusCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: "center",
+  },
+  statusInfo: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  statusValue: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: Colors.primary,
+  },
+  statusLabel: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  progressBar: {
+    width: "100%",
+    height: 8,
+    backgroundColor: Colors.divider,
+    borderRadius: 4,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: Colors.primary,
+    borderRadius: 4,
+  },
+  statusDescription: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    textAlign: "center",
   },
   joinContainer: {
     paddingHorizontal: 20,
@@ -757,6 +859,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+    marginBottom: 8,
+  },
+  joinedButton: {
+    backgroundColor: Colors.success,
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  priceInfo: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
   },
 });
 

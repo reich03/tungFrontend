@@ -1,6 +1,5 @@
 import { Player, Host, Event, EventParticipant, PlayerPosition, FieldType } from '../types';
 
-// Mock Users Data
 export const mockPlayers: Player[] = [
   {
     id: '1',
@@ -222,7 +221,6 @@ export const mockHosts: Host[] = [
   },
 ];
 
-// Generate mock participants for events
 const generateMockParticipants = (count: number): EventParticipant[] => {
   const participants: EventParticipant[] = [];
   const availablePlayers = [...mockPlayers];
@@ -563,16 +561,13 @@ export class MockDataService {
       );
     }
     
-    // TODO: Implementar filtro por ubicación
     if (query.location) {
-      // Por ahora, simplemente devolvemos todos los eventos filtrados
-      // En una implementación real, calcularíamos la distancia
+     
     }
     
     return filteredEvents;
   }
 
-  // Statistics Methods
   static async getHostStatistics(hostId: string): Promise<{
     totalEvents: number;
     totalRevenue: number;
@@ -596,7 +591,7 @@ export class MockDataService {
         { month: 'Mar', events: 18, revenue: 1260000 },
         { month: 'Abr', events: 20, revenue: 1400000 },
         { month: 'May', events: 22, revenue: 1540000 },
-        { month: 'Jun', events: 8, revenue: 560000 }, // Mes actual (parcial)
+        { month: 'Jun', events: 8, revenue: 560000 }, 
       ],
     };
   }

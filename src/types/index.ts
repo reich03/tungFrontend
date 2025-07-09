@@ -1,21 +1,28 @@
-export type UserType = "player" | "host";
+export type UserType = "player" | "host" | "admin";
 
+export interface BackendUser {
+  id: string;
+  correo: string;
+  nombreCompleto: string;
+  documentoIdentidad: string;
+  rolId: string;
+  rolNombre: string;
+}
 export interface BaseUser {
   id: string;
   email: string;
   fullName: string;
   phone: string;
+  documentoIdentidad: string;
   avatar?: string;
   userType: UserType;
   isActive: boolean;
   createdAt: string;
+  rolId: string;
+  rolNombre: string;
 }
 
-export type PlayerPosition =
-  | "goalkeeper"
-  | "defender"
-  | "midfielder"
-  | "forward";
+export type PlayerPosition = "goalkeeper" | "defender" | "midfielder" | "forward" | "shuttlecock";
 
 export interface PlayerStats {
   pace: number;
@@ -76,6 +83,13 @@ export interface Host extends BaseUser {
     facebook?: string;
   };
 }
+export interface Admin extends BaseUser {
+  userType: "admin";
+  permissions: string[];
+  adminLevel: "super" | "standard";
+}
+
+export type User = Player | Host | Admin;
 
 export type EventStatus =
   | "open"
@@ -131,8 +145,8 @@ export interface FieldFormation {
 export type RootStackParamList = {
   AuthStack: undefined;
   MainStack: undefined;
+  AdminStack: undefined;
 };
-
 export type AuthStackParamList = {
   Welcome: undefined;
   Login: undefined;
@@ -148,6 +162,13 @@ export type MainTabParamList = {
   HostDashboard: undefined;
   Challenges: undefined;
 };
+export type AdminTabParamList = {
+  Dashboard: undefined;
+  Users: undefined;
+  Events: undefined;
+  Reports: undefined;
+  Settings: undefined;
+};
 
 export type HomeStackParamList = {
   MapView: undefined;
@@ -155,30 +176,37 @@ export type HomeStackParamList = {
   JoinEvent: { eventId: string };
 };
 
-// Formularios
 export interface LoginForm {
-  email: string;
+  documentoIdentidad: string;
   password: string;
 }
-
 export interface RegisterForm {
   email: string;
   password: string;
   confirmPassword: string;
   fullName: string;
   phone: string;
+  documentoIdentidad: string;
   userType: UserType;
 }
-
 export interface PlayerRegistrationForm {
+  firstName: string;
+  lastName: string;
+  documentType: string;
+  documentNumber: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+  phone: string;
+  gender: string;
+  birthDate: Date;
+  department: string;
+  city: string;
+  nickname: string;
   position: PlayerPosition;
-  stats: PlayerStats;
-  preferredFoot: "left" | "right" | "both";
-  experience: Player["experience"];
   height: number;
   weight: number;
 }
-
 export interface HostRegistrationForm {
   businessName: string;
   address: string;
@@ -203,4 +231,49 @@ export interface CreateEventForm {
     maxAge?: number;
     minAge?: number;
   };
+}
+export interface PlayerFormData {
+  personalInfo: {
+    firstName: string;
+    lastName: string;
+    documentType: string;
+    documentNumber: string;
+    email: string;
+    password: string;
+    phone: string;
+  };
+  additionalInfo: {
+    gender: string;
+    birthDate: Date;
+    department: string;
+    city: string;
+  };
+  sportInfo: {
+    nickname: string;
+    position: PlayerPosition;
+    alternativePositions: PlayerPosition[];
+  };
+  physicalInfo: {
+    height: number;
+    weight: number;
+  };
+  stats: {
+    // Arquero
+    reach?: number;
+    saves?: number;
+    reflexes?: number;
+    speed?: number;
+    throw?: number;
+    positioning?: number;
+    // Jugador
+    pace?: number;
+    shooting?: number;
+    passing?: number;
+    dribbling?: number;
+    defending?: number;
+    physical?: number;
+  };
+  profileImage?: string;
+  isUnderage?: boolean;
+  isForSponsored?: boolean;
 }

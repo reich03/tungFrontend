@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   ScrollView,
   Animated,
+  RefreshControl,
 } from "react-native";
 import { PanGestureHandler, State } from "react-native-gesture-handler";
 import MapView, { Marker, PROVIDER_GOOGLE, Callout } from "react-native-maps";
@@ -17,257 +18,174 @@ import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import { StackNavigationProp } from "@react-navigation/stack";
 
-import { HomeStackParamList, Event } from "../../types";
+import { HomeStackParamList } from "../../types";
 import { Colors } from "../../constants/Colors";
 import { useAuth } from "../../context/AuthContext";
-import CustomButton from "../../components/common/CustomButton";
+import { EventForFrontend } from "../../types/eventTypes";
+import playerEventService from "../../services/playerEventService";
 
 const { width, height } = Dimensions.get("window");
 
-type HomeScreenNavigationProp = StackNavigationProp<
-  HomeStackParamList,
-  "MapView"
->;
+interface ServiceResponse<T> {
+  success: boolean;
+  message: string;
+  data?: T;
+}
+
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; 
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+type HomeScreenNavigationProp = StackNavigationProp<HomeStackParamList, "MapView">;
 
 interface Props {
   navigation: HomeScreenNavigationProp;
 }
 
-// Mock data para eventos
-const mockEvents: Event[] = [
-  {
-    id: "1",
-    hostId: "1",
-    host: {
-      id: "1",
-      email: "cancha@ejemplo.com",
-      fullName: "Cancha El Estadio",
-      phone: "+57 300 123 4567",
-      userType: "host",
-      isActive: true,
-      createdAt: "2025-01-01",
-      businessName: "Cancha El Estadio",
-      address: "Calle 72 #15-30, Barranquilla",
-      coordinates: {
-        latitude: 4.1468,
-        longitude: -73.6334,
-      },
-      description: "La mejor cancha sintética de Barranquilla",
-      fields: [],
-      rating: 4.5,
-      totalReviews: 120,
-      businessHours: {},
-      contactInfo: {},
-    },
-    fieldId: "1",
-    field: {
-      id: "1",
-      name: "Cancha Principal",
-      type: "futbol7",
-      capacity: 14,
-      pricePerHour: 50000,
-      hasLighting: true,
-      isIndoor: false,
-      amenities: ["Baños", "Parqueadero", "Cafetería"],
-      images: [],
-      isActive: true,
-    },
-    title: "Fútbol 7 - Viernes en la tarde",
-    description: "Partido amistoso, todos los niveles bienvenidos",
-    date: "2025-06-14",
-    startTime: "18:00",
-    endTime: "19:30",
-    duration: 90,
-    maxPlayers: 14,
-    currentPlayers: 8,
-    pricePerPlayer: 7000,
-    status: "open",
-    participants: [],
-    createdAt: "2025-06-14",
-  },
-  {
-    id: "2",
-    hostId: "2",
-    host: {
-      id: "2",
-      email: "futbol@ejemplo.com",
-      fullName: "Centro Deportivo Norte",
-      phone: "+57 300 987 6543",
-      userType: "host",
-      isActive: true,
-      createdAt: "2025-01-01",
-      businessName: "Centro Deportivo Norte",
-      address: "Carrera 45 #84-12, Barranquilla",
-      coordinates: {
-        latitude: 4.1375,
-        longitude: -73.622,
-      },
-      description: "Complejo deportivo con múltiples canchas",
-      fields: [],
-      rating: 4.2,
-      totalReviews: 89,
-      businessHours: {},
-      contactInfo: {},
-    },
-    fieldId: "2",
-    field: {
-      id: "2",
-      name: "Cancha Norte",
-      type: "futbol5",
-      capacity: 10,
-      pricePerHour: 40000,
-      hasLighting: true,
-      isIndoor: false,
-      amenities: ["Baños", "Parqueadero"],
-      images: [],
-      isActive: true,
-    },
-    title: "Fútbol 5 - Sábado mañana",
-    description: "Partido competitivo, nivel intermedio",
-    date: "2025-06-15",
-    startTime: "09:00",
-    endTime: "10:00",
-    duration: 60,
-    maxPlayers: 10,
-    currentPlayers: 6,
-    pricePerPlayer: 8000,
-    status: "open",
-    participants: [],
-    createdAt: "2025-06-14",
-  },
-  {
-    id: "3",
-    hostId: "1",
-    host: {
-      id: "1",
-      email: "cancha@ejemplo.com",
-      fullName: "Cancha El Estadio",
-      phone: "+57 300 123 4567",
-      userType: "host",
-      isActive: true,
-      createdAt: "2025-01-01",
-      businessName: "Deportivo Central",
-      address: "Carrera 50 #45-12, Barranquilla",
-      coordinates: {
-        latitude: 4.137,
-        longitude: -73.6215,
-      },
-      description: "Centro deportivo familiar",
-      fields: [],
-      rating: 4.8,
-      totalReviews: 89,
-      businessHours: {},
-      contactInfo: {},
-    },
-    fieldId: "1",
-    field: {
-      id: "1",
-      name: "Cancha VIP",
-      type: "futbol11",
-      capacity: 22,
-      pricePerHour: 80000,
-      hasLighting: true,
-      isIndoor: false,
-      amenities: ["Baños", "Parqueadero", "Cafetería", "Vestidores"],
-      images: [],
-      isActive: true,
-    },
-    title: "Fútbol 11 - Domingo",
-    description: "Partido profesional, equipos completos",
-    date: "2025-06-16",
-    startTime: "16:00",
-    endTime: "17:30",
-    duration: 90,
-    maxPlayers: 22,
-    currentPlayers: 18,
-    pricePerPlayer: 12000,
-    status: "open",
-    participants: [],
-    createdAt: "2025-06-14",
-  },
-  {
-    id: "4",
-    hostId: "2",
-    host: {
-      id: "2",
-      email: "futbol@ejemplo.com",
-      fullName: "Centro Deportivo Norte",
-      phone: "+57 300 987 6543",
-      userType: "host",
-      isActive: true,
-      createdAt: "2025-01-01",
-      businessName: "Cancha Los Andes",
-      address: "Calle 80 #25-15, Barranquilla",
-      coordinates: {
-        latitude: 4.145,
-        longitude: -73.629,
-      },
-      description: "Cancha techada con aire acondicionado",
-      fields: [],
-      rating: 4.7,
-      totalReviews: 156,
-      businessHours: {},
-      contactInfo: {},
-    },
-    fieldId: "2",
-    field: {
-      id: "2",
-      name: "Cancha Techada",
-      type: "futbol5",
-      capacity: 10,
-      pricePerHour: 60000,
-      hasLighting: true,
-      isIndoor: true,
-      amenities: ["Baños", "Parqueadero", "A/C", "Vestidores"],
-      images: [],
-      isActive: true,
-    },
-    title: "Fútbol 5 Techado - Lunes",
-    description: "Partido bajo techo, ideal para cualquier clima",
-    date: "2025-06-17",
-    startTime: "20:00",
-    endTime: "21:00",
-    duration: 60,
-    maxPlayers: 10,
-    currentPlayers: 4,
-    pricePerPlayer: 9500,
-    status: "open",
-    participants: [],
-    createdAt: "2025-06-14",
-  },
-];
-
 const BOTTOM_SHEET_MIN_HEIGHT = 140;
 const BOTTOM_SHEET_MAX_HEIGHT = height * 0.7;
 
-// 🔥 REGIÓN INICIAL FIJA - Barranquilla centro
 const INITIAL_REGION = {
-  latitude: 4.1252066,
-  longitude: -73.6377385,
+  latitude: 4.142,
+  longitude: -73.626,
   latitudeDelta: 0.0922,
   longitudeDelta: 0.0421,
 };
 
+interface FieldWithEvents {
+  id: string;
+  name: string;
+  businessName: string;
+  address: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+  rating: number;
+  phone?: string;
+  events: EventForFrontend[];
+  totalAvailableSpots: number;
+  nextEventTime?: string;
+}
+
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
-  const [events, setEvents] = useState<Event[]>(mockEvents);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  
-  // 🔥 EL MAPA SIEMPRE INICIA EN LA REGIÓN FIJA
+  const [events, setEvents] = useState<EventForFrontend[]>([]);
+  const [fieldsWithEvents, setFieldsWithEvents] = useState<FieldWithEvents[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedField, setSelectedField] = useState<FieldWithEvents | null>(null);
   const [mapRegion, setMapRegion] = useState(INITIAL_REGION);
-  
+
   const mapRef = useRef<MapView>(null);
   const bottomSheetHeight = useRef(new Animated.Value(BOTTOM_SHEET_MIN_HEIGHT)).current;
   const lastGestureY = useRef(new Animated.Value(0)).current;
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     requestLocationPermission();
+    loadEvents();
   }, []);
 
-  // 🔥 FUNCIÓN MODIFICADA - NO ACTUALIZA EL MAPA AUTOMÁTICAMENTE
+  useEffect(() => {
+    if (userLocation) {
+      loadEvents();
+    }
+  }, [userLocation]);
+
+  const loadEvents = async () => {
+    try {
+      setLoading(true);
+
+      let result;
+      if (userLocation) {
+        result = await playerEventService.getAvailableEventsByLocation(
+          userLocation.coords.latitude,
+          userLocation.coords.longitude,
+          20 // Radio de 20km
+        );
+      } else {
+        result = await playerEventService.getAvailableEvents();
+      }
+
+      if (result.success && result.data) {
+        setEvents(result.data);
+        groupEventsByField(result.data);
+        console.log(`✅ ${result.data.length} eventos cargados exitosamente`);
+      } else {
+        console.error("Error loading events:", result.message);
+        Alert.alert("Error", result.message || "No se pudieron cargar los eventos disponibles");
+      }
+    } catch (error) {
+      console.error("Error loading events:", error);
+      Alert.alert("Error", "No se pudieron cargar los eventos");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const groupEventsByField = (eventsList: EventForFrontend[]) => {
+    const fieldsMap = new Map<string, FieldWithEvents>();
+
+    eventsList.forEach(event => {
+      const fieldKey = `${event.fieldInfo?.businessName || event.fieldName}-${event.fieldId}`;
+
+      if (!fieldsMap.has(fieldKey)) {
+        const fieldData: FieldWithEvents = {
+          id: event.fieldId || fieldKey,
+          name: event.fieldName,
+          businessName: event.fieldInfo?.businessName || event.fieldName,
+          address: event.fieldInfo?.address || "Dirección no disponible",
+          coordinates: {
+            latitude: event.fieldInfo?.coordinates?.latitude || INITIAL_REGION.latitude,
+            longitude: event.fieldInfo?.coordinates?.longitude || INITIAL_REGION.longitude,
+          },
+          rating: event.fieldInfo?.rating || 0,
+          phone: event.fieldInfo?.phone,
+          events: [],
+          totalAvailableSpots: 0,
+          nextEventTime: undefined,
+        };
+        fieldsMap.set(fieldKey, fieldData);
+      }
+
+      const field = fieldsMap.get(fieldKey)!;
+      field.events.push(event);
+      field.totalAvailableSpots += event.availableSpaces;
+
+      if (!field.nextEventTime || event.time < field.nextEventTime) {
+        field.nextEventTime = event.time;
+      }
+    });
+
+    fieldsMap.forEach(field => {
+      field.events.sort((a, b) => a.time.localeCompare(b.time));
+    });
+
+    const validFields = Array.from(fieldsMap.values()).filter(field =>
+      field.coordinates.latitude !== INITIAL_REGION.latitude ||
+      field.coordinates.longitude !== INITIAL_REGION.longitude
+    );
+
+    setFieldsWithEvents(validFields);
+
+    console.log(`🏟️ ${validFields.length} canchas agrupadas con coordenadas válidas`);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadEvents();
+    setRefreshing(false);
+  };
+
   const requestLocationPermission = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -283,16 +201,11 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       const location = await Location.getCurrentPositionAsync({});
       setUserLocation(location);
-
-      // 🔥 YA NO ACTUALIZAMOS mapRegion AQUÍ
-      // Solo guardamos la ubicación del usuario para usarla cuando él quiera
-      
     } catch (error) {
       console.error("Error getting location:", error);
     }
   };
 
-  // 🔥 FUNCIÓN PARA CENTRAR EN LA UBICACIÓN DEL USUARIO MANUALMENTE
   const centerOnUserLocation = () => {
     if (userLocation && mapRef.current) {
       const userRegion = {
@@ -301,9 +214,9 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         latitudeDelta: 0.0922,
         longitudeDelta: 0.0421,
       };
-      
+
       mapRef.current.animateToRegion(userRegion, 1000);
-      setMapRegion(userRegion); // Actualizamos el estado para que se mantenga
+      setMapRegion(userRegion);
     } else {
       Alert.alert(
         "Ubicación no disponible",
@@ -313,16 +226,15 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // 🔥 FUNCIÓN PARA MANEJAR NAVEGACIÓN A UNIRSE AL EVENTO
-  const handleJoinEvent = (event: Event) => {
-    if (event.status === "full") {
+  const handleJoinEvent = (event: EventForFrontend) => {
+    if (event.status === "full" || event.availableSpaces <= 0) {
       Alert.alert(
         "Partido completo",
-        "Este partido ya está completo. ¿Quieres ver los detalles o unirte a la lista de espera?",
+        "Este partido ya está completo. ¿Quieres ver los detalles?",
         [
           { text: "Cancelar", style: "cancel" },
-          { 
-            text: "Ver detalles", 
+          {
+            text: "Ver detalles",
             onPress: () => navigation.navigate("EventDetails", { eventId: event.id })
           },
         ]
@@ -339,22 +251,17 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    // Para eventos abiertos, ir directamente a JoinEvent
     navigation.navigate("JoinEvent", { eventId: event.id });
   };
 
   const toggleBottomSheet = () => {
-    const toValue = isExpanded
-      ? BOTTOM_SHEET_MIN_HEIGHT
-      : BOTTOM_SHEET_MAX_HEIGHT;
-
+    const toValue = isExpanded ? BOTTOM_SHEET_MIN_HEIGHT : BOTTOM_SHEET_MAX_HEIGHT;
     Animated.spring(bottomSheetHeight, {
       toValue,
       useNativeDriver: false,
       tension: 150,
       friction: 10,
     }).start();
-
     setIsExpanded(!isExpanded);
   };
 
@@ -364,31 +271,18 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const onHandlerStateChange = (event: any) => {
-    if (event.nativeEvent.oldState === State.BEGAN) {
-      setIsDragging(true);
-    }
-
     if (event.nativeEvent.oldState === State.ACTIVE) {
-      setIsDragging(false);
       const { translationY, velocityY } = event.nativeEvent;
-
       let shouldExpand = isExpanded;
 
       if (Math.abs(velocityY) > 500) {
         shouldExpand = velocityY < 0;
       } else {
-        const currentHeight = isExpanded
-          ? BOTTOM_SHEET_MAX_HEIGHT
-          : BOTTOM_SHEET_MIN_HEIGHT;
-        const threshold =
-          (BOTTOM_SHEET_MAX_HEIGHT - BOTTOM_SHEET_MIN_HEIGHT) / 2;
+        const threshold = (BOTTOM_SHEET_MAX_HEIGHT - BOTTOM_SHEET_MIN_HEIGHT) / 2;
         shouldExpand = translationY < -threshold;
       }
 
-      const toValue = shouldExpand
-        ? BOTTOM_SHEET_MAX_HEIGHT
-        : BOTTOM_SHEET_MIN_HEIGHT;
-
+      const toValue = shouldExpand ? BOTTOM_SHEET_MAX_HEIGHT : BOTTOM_SHEET_MIN_HEIGHT;
       Animated.spring(bottomSheetHeight, {
         toValue,
         useNativeDriver: false,
@@ -402,173 +296,174 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  // 🔥 FUNCIÓN PARA OBTENER EL TEXTO Y COLOR DEL BOTÓN SEGÚN EL STATUS
-  const getEventButtonConfig = (event: Event) => {
-    switch (event.status) {
-      case "open":
-        return {
-          text: "Unirse al partido",
-          color: Colors.primary,
-          backgroundColor: Colors.primary,
-        };
-      case "full":
-        return {
-          text: "Partido completo",
-          color: Colors.warning,
-          backgroundColor: Colors.warning,
-        };
-      case "cancelled":
-        return {
-          text: "Cancelado",
-          color: Colors.error,
-          backgroundColor: Colors.error,
-        };
-      default:
-        return {
-          text: "Ver detalles",
-          color: Colors.primary,
-          backgroundColor: Colors.primary,
-        };
-    }
-  };
+  const FieldCallout: React.FC<{ field: FieldWithEvents }> = ({ field }) => {
+    const nextEvent = field.events[0]; 
+    const totalEvents = field.events.length;
 
-  const CustomCallout: React.FC<{ event: Event }> = ({ event }) => {
-    const buttonConfig = getEventButtonConfig(event);
-    
     return (
       <View style={styles.calloutContainer}>
         <View style={styles.calloutHeader}>
-          <Text style={styles.calloutTitle}>{event.host.businessName}</Text>
+          <Text style={styles.calloutTitle}>{field.businessName}</Text>
           <View style={styles.calloutRating}>
             <Ionicons name="star" size={12} color="#FFD700" />
-            <Text style={styles.calloutRatingText}>{event.host.rating}</Text>
-          </View>
-        </View>
-
-        <Text style={styles.calloutSubtitle}>{event.title}</Text>
-
-        <View style={styles.calloutDetails}>
-          <View style={styles.calloutDetail}>
-            <Ionicons name="time-outline" size={12} color={Colors.primary} />
-            <Text style={styles.calloutDetailText}>{event.startTime}</Text>
-          </View>
-
-          <View style={styles.calloutDetail}>
-            <Ionicons name="people-outline" size={12} color={Colors.primary} />
-            <Text style={styles.calloutDetailText}>
-              {event.currentPlayers}/{event.maxPlayers}
-            </Text>
-          </View>
-
-          <View style={styles.calloutDetail}>
-            <Ionicons name="cash-outline" size={12} color={Colors.primary} />
-            <Text style={styles.calloutDetailText}>
-              ${event.pricePerPlayer.toLocaleString()}
+            <Text style={styles.calloutRatingText}>
+              {field.rating > 0 ? field.rating.toFixed(1) : "N/A"}
             </Text>
           </View>
         </View>
 
-        {/* 🔥 BOTÓN ACTUALIZADO PARA IR A JOINEVENT */}
+        <Text style={styles.calloutSubtitle}>{field.name}</Text>
+
+        <View style={styles.calloutStats}>
+          <View style={styles.calloutStat}>
+            <Ionicons name="football-outline" size={14} color={Colors.primary} />
+            <Text style={styles.calloutStatText}>
+              {totalEvents} evento{totalEvents !== 1 ? "s" : ""}
+            </Text>
+          </View>
+          <View style={styles.calloutStat}>
+            <Ionicons name="people-outline" size={14} color={Colors.success} />
+            <Text style={styles.calloutStatText}>
+              {field.totalAvailableSpots} cupo{field.totalAvailableSpots !== 1 ? "s" : ""}
+            </Text>
+          </View>
+        </View>
+
+        {nextEvent && (
+          <View style={styles.calloutNextEvent}>
+            <Text style={styles.calloutNextEventTitle}>Próximo partido:</Text>
+            <Text style={styles.calloutNextEventTime}>
+              {nextEvent.time} - {nextEvent.title}
+            </Text>
+            <Text style={styles.calloutNextEventPrice}>
+              ${nextEvent.fieldInfo?.pricePerPlayer?.toLocaleString() || "N/A"}
+            </Text>
+          </View>
+        )}
+
         <TouchableOpacity
-          style={[styles.calloutButton, { backgroundColor: buttonConfig.backgroundColor }]}
-          onPress={() => handleJoinEvent(event)}
+          style={styles.calloutButton}
+          onPress={() => {
+            if (nextEvent) {
+              handleJoinEvent(nextEvent);
+            }
+          }}
         >
-          <Text style={styles.calloutButtonText}>{buttonConfig.text}</Text>
+          <Text style={styles.calloutButtonText}>
+            {field.totalAvailableSpots > 0 ? "Ver eventos" : "Ver detalles"}
+          </Text>
         </TouchableOpacity>
       </View>
     );
   };
 
-  const EventListItem: React.FC<{ event: Event }> = ({ event }) => (
-    <TouchableOpacity
-      style={styles.eventListItem}
-      // 🔥 CAMBIO: AHORA VA A JOINEVENT EN LUGAR DE EVENTDETAILS
-      onPress={() => handleJoinEvent(event)}
-      activeOpacity={0.9}
-    >
-      <View style={styles.eventItemLeft}>
-        <View style={[
-          styles.eventItemIcon,
-          { 
-            backgroundColor: event.status === "open" 
-              ? Colors.primaryLight 
-              : event.status === "full" 
-                ? "rgba(255, 152, 0, 0.1)" 
-                : "rgba(244, 67, 54, 0.1)" 
-          }
-        ]}>
-          <Ionicons 
-            name="football" 
-            size={20} 
-            color={
-              event.status === "open" 
-                ? Colors.primary 
-                : event.status === "full" 
-                  ? Colors.warning 
-                  : Colors.error
-            } 
-          />
-        </View>
+  const EventListItem: React.FC<{ event: EventForFrontend }> = ({ event }) => {
+    const isAvailable = event.status === "available" && event.availableSpaces > 0;
+    const isFull = event.availableSpaces <= 0;
 
-        <View style={styles.eventItemInfo}>
-          <Text style={styles.eventItemTitle}>{event.title}</Text>
-          <Text style={styles.eventItemHost}>{event.host.businessName}</Text>
-          <View style={styles.eventItemDetails}>
-            <Text style={styles.eventItemDetail}>
-              {event.startTime} • {event.field.type}
+    return (
+      <TouchableOpacity
+        style={styles.eventListItem}
+        onPress={() => handleJoinEvent(event)}
+        activeOpacity={0.9}
+      >
+        <View style={styles.eventItemLeft}>
+          <View style={[
+            styles.eventItemIcon,
+            {
+              backgroundColor: isAvailable
+                ? Colors.primaryLight
+                : isFull
+                  ? "rgba(255, 152, 0, 0.1)"
+                  : "rgba(244, 67, 54, 0.1)"
+            }
+          ]}>
+            <Ionicons
+              name="football"
+              size={20}
+              color={isAvailable ? Colors.primary : isFull ? Colors.warning : Colors.error}
+            />
+          </View>
+
+          <View style={styles.eventItemInfo}>
+            <Text style={styles.eventItemTitle}>{event.title}</Text>
+            <Text style={styles.eventItemHost}>
+              {event.fieldInfo?.businessName || event.fieldName}
             </Text>
-            <Text style={styles.eventItemPrice}>
-              ${event.pricePerPlayer.toLocaleString()}
-            </Text>
+            <View style={styles.eventItemDetails}>
+              <Text style={styles.eventItemDetail}>
+                {event.time} • {event.fieldType}
+              </Text>
+              <Text style={styles.eventItemPrice}>
+                ${event.fieldInfo?.pricePerPlayer?.toLocaleString() || "N/A"}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.eventItemRight}>
-        <View
-          style={[
+        <View style={styles.eventItemRight}>
+          <View style={[
             styles.eventItemStatus,
             {
-              backgroundColor:
-                event.status === "open" 
-                  ? Colors.primaryLight 
-                  : event.status === "full"
-                    ? "rgba(255, 152, 0, 0.1)"
-                    : "rgba(244, 67, 54, 0.1)",
+              backgroundColor: isAvailable
+                ? Colors.primaryLight
+                : isFull
+                  ? "rgba(255, 152, 0, 0.1)"
+                  : "rgba(244, 67, 54, 0.1)",
             },
-          ]}
-        >
-          <Text
-            style={[
+          ]}>
+            <Text style={[
               styles.eventItemStatusText,
               {
-                color: 
-                  event.status === "open" 
-                    ? Colors.primary 
-                    : event.status === "full"
-                      ? Colors.warning
-                      : Colors.error,
+                color: isAvailable ? Colors.primary : isFull ? Colors.warning : Colors.error,
               },
-            ]}
-          >
-            {event.currentPlayers}/{event.maxPlayers}
-          </Text>
+            ]}>
+              {event.registeredPlayers}/{event.maxPlayers}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
+      </TouchableOpacity>
+    );
+  };
 
-        <Ionicons
-          name="chevron-forward"
-          size={16}
-          color={Colors.textSecondary}
-        />
-      </View>
-    </TouchableOpacity>
-  );
+  const availableEvents = events.filter(e => e.status === "available" && e.availableSpaces > 0);
+  const totalAvailableSpots = events.reduce((sum, event) => sum + event.availableSpaces, 0);
+
+  const nearestDistance = useMemo(() => {
+    if (!userLocation || events.length === 0) return "N/A";
+
+    const distances = events
+      .filter(e => e.fieldInfo?.coordinates)
+      .map(event => {
+        const distance = calculateDistance(
+          userLocation.coords.latitude,
+          userLocation.coords.longitude,
+          event.fieldInfo!.coordinates.latitude,
+          event.fieldInfo!.coordinates.longitude
+        );
+        return distance;
+      })
+      .sort((a, b) => a - b);
+
+    return distances.length > 0 ? `${distances[0].toFixed(1)}km` : "N/A";
+  }, [userLocation, events]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Cargando eventos...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
 
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
@@ -583,11 +478,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               style={styles.notificationButton}
               activeOpacity={0.8}
             >
-              <Ionicons
-                name="notifications-outline"
-                size={20}
-                color={Colors.textPrimary}
-              />
+              <Ionicons name="notifications-outline" size={20} color={Colors.textPrimary} />
               <View style={styles.notificationBadge} />
             </TouchableOpacity>
 
@@ -599,31 +490,24 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Quick stats */}
         <View style={styles.quickStats}>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{events.length}</Text>
-            <Text style={styles.statLabel}>Partidos hoy</Text>
+            <Text style={styles.statNumber}>{availableEvents.length}</Text>
+            <Text style={styles.statLabel}>Partidos disponibles</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {events.reduce(
-                (sum, e) => sum + (e.maxPlayers - e.currentPlayers),
-                0
-              )}
-            </Text>
+            <Text style={styles.statNumber}>{totalAvailableSpots}</Text>
             <Text style={styles.statLabel}>Cupos libres</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>2.3km</Text>
+            <Text style={styles.statNumber}>{nearestDistance}</Text>
             <Text style={styles.statLabel}>Más cercano</Text>
           </View>
         </View>
       </View>
 
-      {/* Map */}
       <Animated.View
         style={[
           styles.mapContainer,
@@ -631,11 +515,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             marginBottom: Animated.add(
               bottomSheetHeight,
               lastGestureY.interpolate({
-                inputRange: [
-                  -BOTTOM_SHEET_MAX_HEIGHT,
-                  0,
-                  BOTTOM_SHEET_MAX_HEIGHT,
-                ],
+                inputRange: [-BOTTOM_SHEET_MAX_HEIGHT, 0, BOTTOM_SHEET_MAX_HEIGHT],
                 outputRange: [
                   BOTTOM_SHEET_MAX_HEIGHT - BOTTOM_SHEET_MIN_HEIGHT,
                   0,
@@ -651,81 +531,78 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           ref={mapRef}
           style={styles.map}
           provider={PROVIDER_GOOGLE}
-          initialRegion={INITIAL_REGION} // 🔥 REGIÓN INICIAL FIJA
-          region={mapRegion} // 🔥 REGIÓN CONTROLADA
-          onRegionChangeComplete={setMapRegion} // 🔥 PERMITIR NAVEGACIÓN MANUAL
-          showsUserLocation={true} // 🔥 MOSTRAR UBICACIÓN DEL USUARIO (PUNTO AZUL)
-          showsMyLocationButton={false} // 🔥 BOTÓN PERSONALIZADO
+          initialRegion={INITIAL_REGION}
+          region={mapRegion}
+          onRegionChangeComplete={setMapRegion}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
           mapType="standard"
         >
-          {events.map((event) => (
+          {fieldsWithEvents.map((field) => (
             <Marker
-              key={event.id}
-              coordinate={event.host.coordinates}
-              onPress={() => setSelectedEvent(event)}
+              key={field.id}
+              coordinate={field.coordinates}
+              onPress={() => setSelectedField(field)}
             >
               <View style={styles.markerContainer}>
-                <View
-                  style={[
-                    styles.marker,
-                    event.currentPlayers >= event.maxPlayers && styles.markerFull,
-                    event.status === "cancelled" && styles.markerCancelled,
-                  ]}
-                >
-                  <Ionicons
-                    name="football"
-                    size={16}
-                    color={Colors.textLight}
-                  />
+                <View style={[
+                  styles.marker,
+                  field.totalAvailableSpots <= 0 && styles.markerFull,
+                ]}>
+                  <Ionicons name="business" size={16} color={Colors.textLight} />
                 </View>
-                <View
-                  style={[
-                    styles.markerBadge,
-                    event.currentPlayers >= event.maxPlayers && styles.markerBadgeFull,
-                    event.status === "cancelled" && styles.markerBadgeCancelled,
-                  ]}
-                >
+                <View style={[
+                  styles.markerBadge,
+                  field.totalAvailableSpots <= 0 && styles.markerBadgeFull,
+                ]}>
                   <Text style={styles.markerText}>
-                    {event.status === "cancelled" 
-                      ? "❌" 
-                      : `${event.currentPlayers}/${event.maxPlayers}`
-                    }
+                    {field.events.length}
                   </Text>
                 </View>
               </View>
 
               <Callout tooltip>
-                <CustomCallout event={event} />
+                <FieldCallout field={field} />
               </Callout>
             </Marker>
           ))}
         </MapView>
 
-        {/* Map Controls */}
         <View style={styles.mapControls}>
           <TouchableOpacity
             style={[
               styles.mapControlButton,
-              !userLocation && styles.mapControlButtonDisabled // 🔥 VISUAL CUANDO NO HAY UBICACIÓN
+              !userLocation && styles.mapControlButtonDisabled
             ]}
             onPress={centerOnUserLocation}
             activeOpacity={0.8}
-            disabled={!userLocation} // 🔥 DESHABILITAR SI NO HAY UBICACIÓN
+            disabled={!userLocation}
           >
-            <Ionicons 
-              name="locate" 
-              size={20} 
-              color={userLocation ? Colors.primary : Colors.textSecondary} // 🔥 COLOR DINÁMICO
+            <Ionicons
+              name="locate"
+              size={20}
+              color={userLocation ? Colors.primary : Colors.textSecondary}
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.mapControlButton} activeOpacity={0.8}>
-            <Ionicons name="options-outline" size={20} color={Colors.primary} />
+          <TouchableOpacity
+            style={[
+              styles.mapControlButton,
+              refreshing && styles.mapControlButtonLoading
+            ]}
+            onPress={handleRefresh}
+            activeOpacity={0.8}
+            disabled={refreshing}
+          >
+            <Ionicons
+              name="refresh-outline"
+              size={20}
+              color={refreshing ? Colors.textSecondary : Colors.primary}
+            />
           </TouchableOpacity>
         </View>
       </Animated.View>
 
-      {/* BOTTOM SHEET */}
       <Animated.View
         style={[
           styles.bottomSheet,
@@ -733,11 +610,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             height: Animated.add(
               bottomSheetHeight,
               lastGestureY.interpolate({
-                inputRange: [
-                  -BOTTOM_SHEET_MAX_HEIGHT,
-                  0,
-                  BOTTOM_SHEET_MAX_HEIGHT,
-                ],
+                inputRange: [-BOTTOM_SHEET_MAX_HEIGHT, 0, BOTTOM_SHEET_MAX_HEIGHT],
                 outputRange: [
                   BOTTOM_SHEET_MAX_HEIGHT - BOTTOM_SHEET_MIN_HEIGHT,
                   0,
@@ -768,7 +641,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <View>
             <Text style={styles.bottomSheetTitle}>Próximos partidos</Text>
             <Text style={styles.bottomSheetSubtitle}>
-              {events.filter(e => e.status === "open").length} eventos disponibles
+              {availableEvents.length} evento{availableEvents.length !== 1 ? "s" : ""} disponible{availableEvents.length !== 1 ? "s" : ""}
             </Text>
           </View>
 
@@ -789,19 +662,39 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           style={styles.bottomSheetContent}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.bottomSheetScrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
+            />
+          }
         >
-          {events.map((event) => (
-            <EventListItem key={event.id} event={event} />
-          ))}
+          {events.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="football-outline" size={48} color={Colors.textSecondary} />
+              <Text style={styles.emptyStateTitle}>No hay eventos disponibles</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                Toca el botón de actualizar para buscar nuevos partidos
+              </Text>
+            </View>
+          ) : (
+            <>
+              {events.map((event) => (
+                <EventListItem key={event.id} event={event} />
+              ))}
 
-          <TouchableOpacity
-            style={styles.viewMoreButton}
-            onPress={() => navigation.navigate("EventsList")}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.viewMoreText}>Ver todos los partidos</Text>
-            <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.viewMoreButton}
+                onPress={() => navigation.navigate("EventsList")}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.viewMoreText}>Ver todos los partidos</Text>
+                <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
+              </TouchableOpacity>
+            </>
+          )}
         </ScrollView>
       </Animated.View>
     </SafeAreaView>
@@ -812,6 +705,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
   header: {
     backgroundColor: Colors.background,
     paddingHorizontal: 20,
@@ -821,6 +723,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerTop: {
+    top: 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
@@ -933,10 +836,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
-  // 🔥 NUEVO ESTILO PARA BOTÓN DESHABILITADO
   mapControlButtonDisabled: {
     backgroundColor: Colors.surface,
     opacity: 0.6,
+  },
+  mapControlButtonLoading: {
+    backgroundColor: Colors.surface,
+    opacity: 0.8,
   },
   markerContainer: {
     alignItems: "center",
@@ -959,10 +865,6 @@ const styles = StyleSheet.create({
   markerFull: {
     backgroundColor: Colors.warning,
   },
-  // 🔥 NUEVO ESTILO PARA EVENTOS CANCELADOS
-  markerCancelled: {
-    backgroundColor: Colors.error,
-  },
   markerBadge: {
     backgroundColor: Colors.success,
     borderRadius: 8,
@@ -975,10 +877,6 @@ const styles = StyleSheet.create({
   markerBadgeFull: {
     backgroundColor: Colors.warning,
   },
-  // 🔥 NUEVO ESTILO PARA BADGES CANCELADOS
-  markerBadgeCancelled: {
-    backgroundColor: Colors.error,
-  },
   markerText: {
     fontSize: 9,
     fontWeight: "700",
@@ -987,8 +885,9 @@ const styles = StyleSheet.create({
   calloutContainer: {
     backgroundColor: Colors.background,
     borderRadius: 12,
-    padding: 12,
-    minWidth: 200,
+    padding: 16,
+    minWidth: 240,
+    maxWidth: 280,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -1002,7 +901,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   calloutTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "700",
     color: Colors.textPrimary,
     flex: 1,
@@ -1018,33 +917,56 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   calloutSubtitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: Colors.textSecondary,
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  calloutDetails: {
+  calloutStats: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 10,
+    gap: 16,
+    marginBottom: 12,
   },
-  calloutDetail: {
+  calloutStat: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 4,
   },
-  calloutDetailText: {
-    fontSize: 11,
+  calloutStatText: {
+    fontSize: 12,
     color: Colors.textSecondary,
     fontWeight: "500",
   },
+  calloutNextEvent: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+  },
+  calloutNextEventTitle: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: Colors.primary,
+    marginBottom: 2,
+  },
+  calloutNextEventTime: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  calloutNextEventPrice: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.primary,
+  },
   calloutButton: {
     backgroundColor: Colors.primary,
-    borderRadius: 6,
-    paddingVertical: 6,
+    borderRadius: 8,
+    paddingVertical: 8,
     alignItems: "center",
   },
   calloutButtonText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
     color: Colors.textLight,
   },
@@ -1176,6 +1098,23 @@ const styles = StyleSheet.create({
   eventItemStatusText: {
     fontSize: 12,
     fontWeight: "700",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
   },
   viewMoreButton: {
     flexDirection: "row",

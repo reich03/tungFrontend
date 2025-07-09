@@ -32,26 +32,29 @@ import CustomButton from "../../components/common/CustomButton";
 
 const { width: screenWidth } = Dimensions.get("window");
 
-// Colores grises elegantes
-const ImprovedColors = {
-  primary: "#3C464F", // Gris principal elegante
-  primaryLight: "#5A6B7A",
-  primaryDark: "#2A3239",
-  secondary: "#8B9CAF", // Gris azulado
-  accent: "#7B8FA3", // Gris suave
-  background: "#F5F7FA",
+const FootballColors = {
+  primary: "#16A34A",
+  primaryLight: "#22C55E", 
+  primaryDark: "#15803D", 
+  secondary: "#059669", 
+  accent: "#10B981", 
+  background: "#F0FDF4", 
   surface: "#FFFFFF",
-  textPrimary: "#1A1D23",
-  textSecondary: "#4A5568",
-  textMuted: "#718096",
+  textPrimary: "#0F172A",
+  textSecondary: "#475569",
+  textMuted: "#64748B",
   textLight: "#FFFFFF",
   border: "#E2E8F0",
   divider: "#F1F5F9",
-  success: "#48BB78",
-  warning: "#ED8936",
-  error: "#E53E3E",
-  gradientStart: "#3C464F",
-  gradientEnd: "#5A6B7A",
+  success: "#16A34A",
+  warning: "#F59E0B",
+  error: "#DC2626",
+  gradientStart: "#16A34A",
+  gradientEnd: "#22C55E",
+  statsBase: "#3B82F6", 
+  statsGain: "#16A34A", 
+  cardGold: "#F59E0B", 
+  cardDiamond: "#8B5CF6",
 };
 
 const ProfileScreen: React.FC = () => {
@@ -67,8 +70,8 @@ const ProfileScreen: React.FC = () => {
       "🔐 Cerrar Sesión",
       "¿Estás seguro de que quieres cerrar tu sesión?\n\nTus datos estarán seguros y podrás volver cuando quieras.",
       [
-        { 
-          text: "Cancelar", 
+        {
+          text: "Cancelar",
           style: "cancel",
           onPress: () => console.log("Logout cancelado")
         },
@@ -81,7 +84,7 @@ const ProfileScreen: React.FC = () => {
           },
         },
       ],
-      { 
+      {
         cancelable: true,
         userInterfaceStyle: 'light'
       }
@@ -93,7 +96,7 @@ const ProfileScreen: React.FC = () => {
 
     Animated.timing(flipAnimation, {
       toValue,
-      duration: 600, 
+      duration: 600,
       useNativeDriver: true,
     }).start();
 
@@ -157,79 +160,101 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
-  const getOverallColor = (rating: number): string => {
-    if (rating >= 90) return "#48BB78"; // Verde éxito
-    if (rating >= 80) return "#ED8936"; // Naranja/ámbar
-    if (rating >= 70) return "#5A6B7A"; // Gris medio
-    if (rating >= 60) return "#8B5A3A"; // Bronce
-    return "#6B5B73"; // Gris oscuro
+  const getCardType = (rating: number): { color: string; label: string; gradient: string[] } => {
+    if (rating >= 95) return {
+      color: "#8B5CF6",
+      label: "LEGEND",
+      gradient: ["#8B5CF6", "#A855F7", "#C084FC"]
+    };
+    if (rating >= 90) return {
+      color: "#F59E0B",
+      label: "GOLD",
+      gradient: ["#F59E0B", "#FBBF24", "#FCD34D"]
+    };
+    if (rating >= 85) return {
+      color: "#16A34A",
+      label: "RARE",
+      gradient: ["#16A34A", "#22C55E", "#4ADE80"]
+    };
+    if (rating >= 80) return {
+      color: "#3B82F6",
+      label: "BLUE",
+      gradient: ["#3B82F6", "#60A5FA", "#93C5FD"]
+    };
+    return {
+      color: "#6B7280",
+      label: "BRONZE",
+      gradient: ["#6B7280", "#9CA3AF", "#D1D5DB"]
+    };
   };
 
-  // Componente mejorado para el título de la sección de tarjeta
+  const getPlayerStatsWithBase = (stats: any) => {
+    return {
+      pace: { base: Math.max(30, stats.pace - 5), current: stats.pace },
+      shooting: { base: Math.max(30, stats.shooting - 3), current: stats.shooting },
+      passing: { base: Math.max(30, stats.passing - 4), current: stats.passing },
+      dribbling: { base: Math.max(30, stats.dribbling - 6), current: stats.dribbling },
+      defending: { base: Math.max(30, stats.defending - 2), current: stats.defending },
+      physical: { base: Math.max(30, stats.physical - 4), current: stats.physical },
+    };
+  };
+
   const PlayerCardSectionHeader: React.FC = () => {
     return (
       <View style={styles.playerCardSectionHeader}>
-        {/* Background decorativo */}
         <LinearGradient
-          colors={['rgba(60, 70, 79, 0.1)', 'rgba(60, 70, 79, 0.05)', 'transparent']}
+          colors={['rgba(22, 163, 74, 0.1)', 'rgba(22, 163, 74, 0.05)', 'transparent']}
           style={styles.headerBackground}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
-        
-        {/* Elementos decorativos izquierda */}
+
         <View style={styles.decorativeLeft}>
           <View style={styles.decorativeDot} />
           <View style={[styles.decorativeDot, styles.decorativeDotSmall]} />
         </View>
 
-        {/* Contenido principal */}
         <View style={styles.headerContent}>
-          {/* Icono principal */}
           <View style={styles.iconContainer}>
             <LinearGradient
-              colors={[ImprovedColors.primary, ImprovedColors.primaryLight]}
+              colors={[FootballColors.primary, FootballColors.primaryLight]}
               style={styles.iconGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="card" size={24} color="#FFFFFF" />
+              <Ionicons name="football" size={24} color="#FFFFFF" />
             </LinearGradient>
           </View>
 
-          {/* Título con gradiente */}
           <View style={styles.titleContainer}>
             <Text style={styles.sectionTitleEnhanced}>Tu Tarjeta de</Text>
             <LinearGradient
-              colors={[ImprovedColors.primary, ImprovedColors.primaryLight, ImprovedColors.secondary]}
+              colors={[FootballColors.primary, FootballColors.primaryLight, FootballColors.secondary]}
               style={styles.titleGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Text style={styles.gradientTitle}>JUGADOR</Text>
+              <Text style={styles.gradientTitle}>FUTBOLISTA</Text>
             </LinearGradient>
-            
-            {/* Subtítulo */}
-            <Text style={styles.subtitle}>Estadísticas profesionales estilo FIFA</Text>
+
+            <Text style={styles.subtitle}>Estadísticas profesionales estilo FIFA Ultimate Team</Text>
           </View>
         </View>
 
-        {/* Elementos decorativos derecha */}
         <View style={styles.decorativeRight}>
           <View style={styles.decorativeLines}>
             <View style={styles.decorativeLine} />
             <View style={[styles.decorativeLine, styles.decorativeLineShort]} />
             <View style={[styles.decorativeLine, styles.decorativeLineShorter]} />
           </View>
-          <Ionicons 
-            name="football" 
-            size={20} 
-            color={ImprovedColors.primary} 
+          <Ionicons
+            name="trophy"
+            size={20}
+            color={FootballColors.primary}
             style={styles.footballIcon}
           />
         </View>
 
-        {/* Efecto de brillo sutil */}
         <LinearGradient
           colors={['transparent', 'rgba(255, 255, 255, 0.1)', 'transparent']}
           style={styles.shineEffect}
@@ -240,7 +265,6 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
-  // Componente de radar chart mejorado
   const RadarChart: React.FC<{ stats: any }> = ({ stats }) => {
     const size = 220;
     const center = size / 2;
@@ -298,18 +322,17 @@ const ProfileScreen: React.FC = () => {
             <RadialGradient id="radarGrad" cx="50%" cy="50%" r="50%">
               <Stop
                 offset="0%"
-                stopColor={ImprovedColors.primary}
+                stopColor={FootballColors.primary}
                 stopOpacity="0.3"
               />
               <Stop
                 offset="100%"
-                stopColor={ImprovedColors.primary}
+                stopColor={FootballColors.primary}
                 stopOpacity="0.1"
               />
             </RadialGradient>
           </Defs>
 
-          {/* Líneas de nivel */}
           {Array.from({ length: levels }, (_, i) => {
             const level = i + 1;
             const levelPoints = angles.map((angle) =>
@@ -328,14 +351,13 @@ const ProfileScreen: React.FC = () => {
                 key={level}
                 d={levelPath}
                 fill="none"
-                stroke={ImprovedColors.border}
+                stroke={FootballColors.border}
                 strokeWidth="1"
                 opacity={0.3}
               />
             );
           })}
 
-          {/* Líneas radiales */}
           {angles.map((angle, index) => {
             const endPoint = getPoint(angle, 100);
             return (
@@ -345,33 +367,30 @@ const ProfileScreen: React.FC = () => {
                 y1={center}
                 x2={endPoint.x}
                 y2={endPoint.y}
-                stroke={ImprovedColors.border}
+                stroke={FootballColors.border}
                 strokeWidth="1"
                 opacity={0.3}
               />
             );
           })}
 
-          {/* Área de datos */}
           <Path
             d={dataPath}
             fill="url(#radarGrad)"
-            stroke={ImprovedColors.primary}
+            stroke={FootballColors.primary}
             strokeWidth="2"
           />
 
-          {/* Puntos de datos */}
           {dataPoints.map((point, index) => (
             <Circle
               key={index}
               cx={point.x}
               cy={point.y}
               r="4"
-              fill={ImprovedColors.primary}
+              fill={FootballColors.primary}
             />
           ))}
 
-          {/* Labels */}
           {angles.map((angle, index) => {
             const labelPoint = getPoint(angle, 130);
             return (
@@ -380,7 +399,7 @@ const ProfileScreen: React.FC = () => {
                 x={labelPoint.x}
                 y={labelPoint.y}
                 fontSize="12"
-                fill={ImprovedColors.textSecondary}
+                fill={FootballColors.textSecondary}
                 textAnchor="middle"
                 alignmentBaseline="middle"
                 fontWeight="600"
@@ -405,7 +424,7 @@ const ProfileScreen: React.FC = () => {
 
   const FIFAPlayerCard: React.FC<{ player: Player }> = ({ player }) => {
     const overall = getOverallRating(player.stats);
-    const cardColor = getOverallColor(overall);
+    const cardType = getCardType(overall);
 
     const frontInterpolate = flipAnimation.interpolate({
       inputRange: [0, 1],
@@ -421,7 +440,6 @@ const ProfileScreen: React.FC = () => {
       <View style={styles.fifaCardContainer}>
         <TouchableOpacity onPress={flipCard} activeOpacity={0.9}>
           <View style={styles.cardWrapper}>
-            {/* FRONT SIDE */}
             <Animated.View
               style={[
                 styles.cardSide,
@@ -431,13 +449,27 @@ const ProfileScreen: React.FC = () => {
               ]}
             >
               <LinearGradient
-                colors={[cardColor, "#2A3239", "#1A1D23"]}
+                colors={cardType.gradient}
                 style={styles.fifaCard}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                {/* Header */}
+                <View style={styles.cardPattern}>
+                  <View style={styles.patternCircle1} />
+                  <View style={styles.patternCircle2} />
+                  <View style={styles.patternCircle3} />
+                </View>
+
                 <View style={styles.fifaHeader}>
+                  <View style={styles.cardTypeContainer}>
+                    <Text style={styles.cardTypeText}>{cardType.label}</Text>
+                    <View style={styles.cardStars}>
+                      {Array.from({ length: Math.floor(overall / 20) + 1 }, (_, i) => (
+                        <Ionicons key={i} name="star" size={10} color="rgba(255,255,255,0.9)" />
+                      ))}
+                    </View>
+                  </View>
+
                   <View style={styles.ratingContainer}>
                     <Text style={styles.overallText}>{overall}</Text>
                     <Text style={styles.positionText}>
@@ -446,79 +478,104 @@ const ProfileScreen: React.FC = () => {
                   </View>
 
                   <View style={styles.playerAvatar}>
-                    <Text style={styles.avatarInitials}>
-                      {player.fullName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </Text>
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
+                      style={styles.avatarGradient}
+                    >
+                      <Text style={styles.avatarInitials}>
+                        {player.fullName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </Text>
+                    </LinearGradient>
                   </View>
                 </View>
 
-                {/* Nombre del jugador */}
+                <View style={styles.clubLogo}>
+                  <View style={styles.logoContainer}>
+                    <Ionicons name="shield" size={24} color="rgba(255,255,255,0.8)" />
+                  </View>
+                  <Text style={styles.clubName}>TUNG FC</Text>
+                </View>
                 <View style={styles.playerNameContainer}>
                   <Text style={styles.playerName} numberOfLines={1}>
                     {player.fullName.toUpperCase()}
                   </Text>
-                  <Text style={styles.playerSubInfo}>
-                    {getExperienceLevel(player.experience)} •{" "}
-                    {player.preferredFoot === "left" ? "Zurdo" : "Diestro"}
-                  </Text>
+                  <View style={styles.playerDetails}>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="fitness" size={12} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.playerSubInfo}>
+                        {getExperienceLevel(player.experience)}
+                      </Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="footsteps" size={12} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.playerSubInfo}>
+                        {player.preferredFoot === "left" ? "Zurdo" : "Diestro"}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
 
-                {/* Stats principales */}
                 <View style={styles.mainStats}>
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>{player.stats.pace}</Text>
-                      <Text style={styles.statLabel}>VEL</Text>
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statPair}>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statNumber}>{player.stats.pace}</Text>
+                        <Text style={styles.statLabel}>VEL</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statNumber}>{player.stats.shooting}</Text>
+                        <Text style={styles.statLabel}>TIR</Text>
+                      </View>
                     </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>
-                        {player.stats.shooting}
-                      </Text>
-                      <Text style={styles.statLabel}>TIR</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>
-                        {player.stats.passing}
-                      </Text>
-                      <Text style={styles.statLabel}>PAS</Text>
-                    </View>
-                  </View>
 
-                  <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>
-                        {player.stats.dribbling}
-                      </Text>
-                      <Text style={styles.statLabel}>REG</Text>
+                    <View style={styles.statPair}>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statNumber}>{player.stats.passing}</Text>
+                        <Text style={styles.statLabel}>PAS</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statNumber}>{player.stats.dribbling}</Text>
+                        <Text style={styles.statLabel}>REG</Text>
+                      </View>
                     </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>
-                        {player.stats.defending}
-                      </Text>
-                      <Text style={styles.statLabel}>DEF</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statNumber}>
-                        {player.stats.physical}
-                      </Text>
-                      <Text style={styles.statLabel}>FÍS</Text>
+
+                    <View style={styles.statPair}>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statNumber}>{player.stats.defending}</Text>
+                        <Text style={styles.statLabel}>DEF</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statNumber}>{player.stats.physical}</Text>
+                        <Text style={styles.statLabel}>FÍS</Text>
+                      </View>
                     </View>
                   </View>
                 </View>
 
-                {/* Info física */}
                 <View style={styles.physicalInfo}>
-                  <Text style={styles.physicalText}>
-                    {player.height}cm • {player.weight}kg
-                  </Text>
+                  <View style={styles.physicalStats}>
+                    <View style={styles.physicalItem}>
+                      <Ionicons name="resize" size={14} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.physicalText}>{player.height}cm</Text>
+                    </View>
+                    <View style={styles.physicalDivider} />
+                    <View style={styles.physicalItem}>
+                      <Ionicons name="barbell" size={14} color="rgba(255,255,255,0.8)" />
+                      <Text style={styles.physicalText}>{player.weight}kg</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.flipIndicator}>
+                  <Ionicons name="sync" size={14} color="rgba(255,255,255,0.6)" />
+                  <Text style={styles.flipText}>VOLTEAR</Text>
                 </View>
               </LinearGradient>
             </Animated.View>
 
-            {/* BACK SIDE */}
             <Animated.View
               style={[
                 styles.cardSide,
@@ -528,119 +585,84 @@ const ProfileScreen: React.FC = () => {
               ]}
             >
               <LinearGradient
-                colors={["#2A3239", "#1A1D23", cardColor]}
+                colors={[...cardType.gradient].reverse()}
                 style={styles.fifaCard}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
+                <View style={styles.cardPattern}>
+                  <View style={styles.patternCircle1} />
+                  <View style={styles.patternCircle2} />
+                  <View style={styles.patternCircle3} />
+                </View>
+
                 <View style={styles.backHeader}>
                   <Text style={styles.backTitle}>ESTADÍSTICAS DETALLADAS</Text>
                   <Text style={styles.backSubtitle} numberOfLines={1}>
                     {player.fullName.toUpperCase()}
                   </Text>
+                  <View style={styles.overallBadge}>
+                    <Text style={styles.overallBadgeText}>{overall} OVR</Text>
+                  </View>
                 </View>
 
                 <View style={styles.detailedStats}>
                   <View style={styles.statRow}>
                     <Text style={styles.detailStatLabel}>Velocidad</Text>
                     <View style={styles.statBarContainer}>
-                      <View
-                        style={[
-                          styles.statBar,
-                          { width: `${player.stats.pace}%` },
-                        ]}
-                      />
+                      <View style={[styles.statBar, { width: `${player.stats.pace}%` }]} />
                     </View>
-                    <Text style={styles.detailStatValue}>
-                      {player.stats.pace}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{player.stats.pace}</Text>
                   </View>
 
                   <View style={styles.statRow}>
                     <Text style={styles.detailStatLabel}>Disparo</Text>
                     <View style={styles.statBarContainer}>
-                      <View
-                        style={[
-                          styles.statBar,
-                          { width: `${player.stats.shooting}%` },
-                        ]}
-                      />
+                      <View style={[styles.statBar, { width: `${player.stats.shooting}%` }]} />
                     </View>
-                    <Text style={styles.detailStatValue}>
-                      {player.stats.shooting}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{player.stats.shooting}</Text>
                   </View>
 
                   <View style={styles.statRow}>
                     <Text style={styles.detailStatLabel}>Pase</Text>
                     <View style={styles.statBarContainer}>
-                      <View
-                        style={[
-                          styles.statBar,
-                          { width: `${player.stats.passing}%` },
-                        ]}
-                      />
+                      <View style={[styles.statBar, { width: `${player.stats.passing}%` }]} />
                     </View>
-                    <Text style={styles.detailStatValue}>
-                      {player.stats.passing}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{player.stats.passing}</Text>
                   </View>
 
                   <View style={styles.statRow}>
                     <Text style={styles.detailStatLabel}>Regate</Text>
                     <View style={styles.statBarContainer}>
-                      <View
-                        style={[
-                          styles.statBar,
-                          { width: `${player.stats.dribbling}%` },
-                        ]}
-                      />
+                      <View style={[styles.statBar, { width: `${player.stats.dribbling}%` }]} />
                     </View>
-                    <Text style={styles.detailStatValue}>
-                      {player.stats.dribbling}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{player.stats.dribbling}</Text>
                   </View>
 
                   <View style={styles.statRow}>
                     <Text style={styles.detailStatLabel}>Defensa</Text>
                     <View style={styles.statBarContainer}>
-                      <View
-                        style={[
-                          styles.statBar,
-                          { width: `${player.stats.defending}%` },
-                        ]}
-                      />
+                      <View style={[styles.statBar, { width: `${player.stats.defending}%` }]} />
                     </View>
-                    <Text style={styles.detailStatValue}>
-                      {player.stats.defending}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{player.stats.defending}</Text>
                   </View>
 
                   <View style={styles.statRow}>
                     <Text style={styles.detailStatLabel}>Físico</Text>
                     <View style={styles.statBarContainer}>
-                      <View
-                        style={[
-                          styles.statBar,
-                          { width: `${player.stats.physical}%` },
-                        ]}
-                      />
+                      <View style={[styles.statBar, { width: `${player.stats.physical}%` }]} />
                     </View>
-                    <Text style={styles.detailStatValue}>
-                      {player.stats.physical}
-                    </Text>
+                    <Text style={styles.detailStatValue}>{player.stats.physical}</Text>
                   </View>
                 </View>
 
                 <View style={styles.backFooter}>
                   <View style={styles.playerInfo}>
                     <Text style={styles.playerInfoText} numberOfLines={1}>
-                      {getPositionName(player.position)} •{" "}
-                      {getExperienceLevel(player.experience)}
+                      {getPositionName(player.position)} • {getExperienceLevel(player.experience)}
                     </Text>
                     <Text style={styles.playerInfoText}>
-                      Pie preferido:{" "}
-                      {player.preferredFoot === "left" ? "Izquierdo" : "Derecho"}
+                      Pie preferido: {player.preferredFoot === "left" ? "Izquierdo" : "Derecho"}
                     </Text>
                   </View>
                 </View>
@@ -652,26 +674,55 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
-  const StatBar: React.FC<{ label: string; value: number; color: string }> = ({
+  const StatBar: React.FC<{ label: string; baseValue: number; currentValue: number }> = ({
     label,
-    value,
-    color,
-  }) => (
-    <View style={styles.modernStatBar}>
-      <View style={styles.statHeader}>
-        <Text style={styles.statBarLabel}>{label}</Text>
-        <Text style={styles.statValue}>{value}</Text>
+    baseValue,
+    currentValue,
+  }) => {
+    const gainValue = currentValue - baseValue;
+
+    return (
+      <View style={styles.modernStatBar}>
+        <View style={styles.statHeader}>
+          <Text style={styles.statBarLabel}>{label}</Text>
+          <View style={styles.statValues}>
+            <Text style={styles.statValueBase}>{baseValue}</Text>
+            {gainValue > 0 && (
+              <>
+                <Text style={styles.statValuePlus}>+{gainValue}</Text>
+                <Text style={styles.statValueCurrent}> = {currentValue}</Text>
+              </>
+            )}
+          </View>
+        </View>
+        <View style={styles.statTrack}>
+          <View
+            style={[
+              styles.statFillBase,
+              { width: `${baseValue}%` }
+            ]}
+          />
+          {gainValue > 0 && (
+            <View
+              style={[
+                styles.statFillGain,
+                {
+                  width: `${gainValue}%`,
+                  left: `${baseValue}%`
+                }
+              ]}
+            />
+          )}
+          <View
+            style={[
+              styles.statIndicator,
+              { left: `${currentValue}%` }
+            ]}
+          />
+        </View>
       </View>
-      <View style={styles.statTrack}>
-        <View
-          style={[
-            styles.statFill,
-            { width: `${value}%`, backgroundColor: color },
-          ]}
-        />
-      </View>
-    </View>
-  );
+    );
+  };
 
   const ProfileOption: React.FC<{
     icon: string;
@@ -710,25 +761,23 @@ const ProfileScreen: React.FC = () => {
           <Ionicons
             name="chevron-forward"
             size={20}
-            color={ImprovedColors.textMuted}
+            color={FootballColors.textMuted}
           />
         )}
       </View>
     </TouchableOpacity>
   );
 
-  // Componente mejorado para la sección de logout
   const LogoutSection: React.FC = () => {
     const handlePressIn = () => setIsLogoutPressed(true);
     const handlePressOut = () => setIsLogoutPressed(false);
 
     return (
       <View style={styles.logoutSection}>
-        {/* Header de la sección */}
         <View style={styles.logoutHeader}>
           <View style={styles.logoutHeaderContent}>
             <View style={styles.logoutIconContainer}>
-              <Ionicons name="shield-checkmark" size={20} color={ImprovedColors.warning} />
+              <Ionicons name="shield-checkmark" size={20} color={FootballColors.warning} />
             </View>
             <View>
               <Text style={styles.logoutHeaderTitle}>Zona de Seguridad</Text>
@@ -737,44 +786,40 @@ const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Cards de acciones */}
         <View style={styles.securityActions}>
-          {/* Configurar PIN */}
           <TouchableOpacity style={styles.securityCard} activeOpacity={0.8}>
             <LinearGradient
-              colors={['rgba(72, 187, 120, 0.1)', 'rgba(72, 187, 120, 0.05)']}
+              colors={['rgba(22, 163, 74, 0.1)', 'rgba(22, 163, 74, 0.05)']}
               style={styles.securityCardGradient}
             >
               <View style={styles.securityCardIcon}>
-                <Ionicons name="lock-closed" size={20} color={ImprovedColors.success} />
+                <Ionicons name="lock-closed" size={20} color={FootballColors.success} />
               </View>
               <View style={styles.securityCardContent}>
                 <Text style={styles.securityCardTitle}>Configurar PIN</Text>
                 <Text style={styles.securityCardSubtitle}>Protege tu cuenta con un PIN</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={ImprovedColors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={FootballColors.textMuted} />
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Backup de datos */}
           <TouchableOpacity style={styles.securityCard} activeOpacity={0.8}>
             <LinearGradient
-              colors={['rgba(69, 183, 209, 0.1)', 'rgba(69, 183, 209, 0.05)']}
+              colors={['rgba(59, 130, 246, 0.1)', 'rgba(59, 130, 246, 0.05)']}
               style={styles.securityCardGradient}
             >
-              <View style={[styles.securityCardIcon, { backgroundColor: 'rgba(69, 183, 209, 0.1)' }]}>
-                <Ionicons name="cloud-upload" size={20} color="#45B7D1" />
+              <View style={[styles.securityCardIcon, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+                <Ionicons name="cloud-upload" size={20} color="#3B82F6" />
               </View>
               <View style={styles.securityCardContent}>
                 <Text style={styles.securityCardTitle}>Respaldar datos</Text>
                 <Text style={styles.securityCardSubtitle}>Guarda tu información en la nube</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={ImprovedColors.textMuted} />
+              <Ionicons name="chevron-forward" size={16} color={FootballColors.textMuted} />
             </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        {/* Botón de logout mejorado */}
         <TouchableOpacity
           style={[
             styles.logoutButton,
@@ -786,39 +831,36 @@ const ProfileScreen: React.FC = () => {
           activeOpacity={1}
         >
           <LinearGradient
-            colors={isLogoutPressed 
-              ? ['#E53E3E', '#C53030', '#9B2C2C'] 
-              : ['#E53E3E', '#C53030']
+            colors={isLogoutPressed
+              ? ['#DC2626', '#B91C1C', '#991B1B']
+              : ['#DC2626', '#B91C1C']
             }
             style={styles.logoutButtonGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            {/* Efecto de brillo */}
             <View style={styles.logoutButtonShine} />
-            
-            {/* Contenido del botón */}
+
             <View style={styles.logoutButtonContent}>
               <View style={styles.logoutButtonIconContainer}>
-                <Ionicons 
-                  name="log-out" 
-                  size={20} 
-                  color="white" 
+                <Ionicons
+                  name="log-out"
+                  size={20}
+                  color="white"
                   style={styles.logoutButtonIcon}
                 />
               </View>
-              
+
               <View style={styles.logoutButtonTextContainer}>
                 <Text style={styles.logoutButtonTitle}>Cerrar Sesión</Text>
                 <Text style={styles.logoutButtonSubtitle}>Salir de forma segura</Text>
               </View>
-              
+
               <View style={styles.logoutButtonArrow}>
                 <Ionicons name="arrow-forward" size={18} color="rgba(255,255,255,0.8)" />
               </View>
             </View>
 
-            {/* Decoración */}
             <View style={styles.logoutButtonDecoration}>
               <View style={styles.decorationDot} />
               <View style={[styles.decorationDot, styles.decorationDotSmall]} />
@@ -826,15 +868,14 @@ const ProfileScreen: React.FC = () => {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Footer informativo */}
         <View style={styles.logoutFooter}>
           <View style={styles.footerContent}>
-            <Ionicons name="information-circle-outline" size={16} color={ImprovedColors.textMuted} />
+            <Ionicons name="information-circle-outline" size={16} color={FootballColors.textMuted} />
             <Text style={styles.footerText}>
               Tu sesión se cerrará automáticamente después de 30 días de inactividad
             </Text>
           </View>
-          
+
           <TouchableOpacity style={styles.footerAction} activeOpacity={0.7}>
             <Text style={styles.footerActionText}>Cambiar configuración</Text>
           </TouchableOpacity>
@@ -843,100 +884,102 @@ const ProfileScreen: React.FC = () => {
     );
   };
 
-  const renderPlayerProfile = (player: Player) => (
-    <View style={styles.playerProfile}>
-      {/* Tarjeta FIFA con header mejorado */}
-      <View style={styles.section}>
-        <PlayerCardSectionHeader />
-        <FIFAPlayerCard player={player} />
-      </View>
+  const renderPlayerProfile = (player: Player) => {
+    const playerStatsWithBase = getPlayerStatsWithBase(player.stats);
 
-      {/* Radar Chart */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Análisis de Habilidades</Text>
-        <RadarChart stats={player.stats} />
-      </View>
-
-      {/* Stats detalladas */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Estadísticas Detalladas</Text>
-        <View style={styles.statsContainer}>
-          <StatBar
-            label="Velocidad"
-            value={player.stats.pace}
-            color={ImprovedColors.primary}
-          />
-          <StatBar
-            label="Disparo"
-            value={player.stats.shooting}
-            color={ImprovedColors.secondary}
-          />
-          <StatBar
-            label="Pase"
-            value={player.stats.passing}
-            color={ImprovedColors.primary}
-          />
-          <StatBar
-            label="Regate"
-            value={player.stats.dribbling}
-            color={ImprovedColors.secondary}
-          />
-          <StatBar
-            label="Defensa"
-            value={player.stats.defending}
-            color={ImprovedColors.primary}
-          />
-          <StatBar
-            label="Físico"
-            value={player.stats.physical}
-            color={ImprovedColors.secondary}
-          />
+    return (
+      <View style={styles.playerProfile}>
+        <View style={styles.section}>
+          <PlayerCardSectionHeader />
+          <FIFAPlayerCard player={player} />
         </View>
-      </View>
 
-      {/* Player Info */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Información deportiva</Text>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>Posición</Text>
-            <Text style={styles.infoValue}>
-              {getPositionName(player.position)}
-            </Text>
-          </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Análisis de Habilidades</Text>
+          <RadarChart stats={player.stats} />
+        </View>
 
-          <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>Experiencia</Text>
-            <Text style={styles.infoValue}>
-              {getExperienceLevel(player.experience)}
-            </Text>
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>Pie preferido</Text>
-            <Text style={styles.infoValue}>
-              {player.preferredFoot === "left"
-                ? "Izquierdo"
-                : player.preferredFoot === "right"
-                ? "Derecho"
-                : "Ambos"}
-            </Text>
-          </View>
-
-          <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>Físico</Text>
-            <Text style={styles.infoValue}>
-              {player.height}cm / {player.weight}kg
-            </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Progreso de Estadísticas</Text>
+          <Text style={styles.sectionSubtitle}>
+            Azul: Base • Verde: Mejora • Total: Estadística actual
+          </Text>
+          <View style={styles.statsContainer}>
+            <StatBar
+              label="Velocidad"
+              baseValue={playerStatsWithBase.pace.base}
+              currentValue={playerStatsWithBase.pace.current}
+            />
+            <StatBar
+              label="Disparo"
+              baseValue={playerStatsWithBase.shooting.base}
+              currentValue={playerStatsWithBase.shooting.current}
+            />
+            <StatBar
+              label="Pase"
+              baseValue={playerStatsWithBase.passing.base}
+              currentValue={playerStatsWithBase.passing.current}
+            />
+            <StatBar
+              label="Regate"
+              baseValue={playerStatsWithBase.dribbling.base}
+              currentValue={playerStatsWithBase.dribbling.current}
+            />
+            <StatBar
+              label="Defensa"
+              baseValue={playerStatsWithBase.defending.base}
+              currentValue={playerStatsWithBase.defending.current}
+            />
+            <StatBar
+              label="Físico"
+              baseValue={playerStatsWithBase.physical.base}
+              currentValue={playerStatsWithBase.physical.current}
+            />
           </View>
         </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Información deportiva</Text>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoLabel}>Posición</Text>
+              <Text style={styles.infoValue}>
+                {getPositionName(player.position)}
+              </Text>
+            </View>
+
+            <View style={styles.infoCard}>
+              <Text style={styles.infoLabel}>Experiencia</Text>
+              <Text style={styles.infoValue}>
+                {getExperienceLevel(player.experience)}
+              </Text>
+            </View>
+
+            <View style={styles.infoCard}>
+              <Text style={styles.infoLabel}>Pie preferido</Text>
+              <Text style={styles.infoValue}>
+                {player.preferredFoot === "left"
+                  ? "Izquierdo"
+                  : player.preferredFoot === "right"
+                  ? "Derecho"
+                  : "Ambos"}
+              </Text>
+            </View>
+
+            <View style={styles.infoCard}>
+              <Text style={styles.infoLabel}>Físico</Text>
+              <Text style={styles.infoValue}>
+                {player.height}cm / {player.weight}kg
+              </Text>
+            </View>
+          </View>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderHostProfile = (host: Host) => (
     <View style={styles.hostProfile}>
-      {/* Business Info */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Información del negocio</Text>
 
@@ -947,7 +990,7 @@ const ProfileScreen: React.FC = () => {
 
           <View style={styles.ratingContainer}>
             <View style={styles.rating}>
-              <Ionicons name="star" size={16} color={ImprovedColors.warning} />
+              <Ionicons name="star" size={16} color={FootballColors.warning} />
               <Text style={styles.ratingText}>{host.rating.toFixed(1)}</Text>
             </View>
             <Text style={styles.reviewsText}>
@@ -957,7 +1000,6 @@ const ProfileScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Fields Summary */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mis canchas</Text>
 
@@ -983,7 +1025,7 @@ const ProfileScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <StatusBar
           barStyle="dark-content"
-          backgroundColor={ImprovedColors.background}
+          backgroundColor={FootballColors.background}
         />
         <View style={styles.loadingContainer}>
           <Text>Cargando perfil...</Text>
@@ -996,12 +1038,11 @@ const ProfileScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor={ImprovedColors.primary}
+        backgroundColor={FootballColors.primary}
       />
 
-      {/* Header mejorado */}
       <LinearGradient
-        colors={[ImprovedColors.gradientStart, ImprovedColors.gradientEnd]}
+        colors={[FootballColors.gradientStart, FootballColors.gradientEnd]}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -1024,7 +1065,7 @@ const ProfileScreen: React.FC = () => {
               <Ionicons
                 name="camera"
                 size={16}
-                color={ImprovedColors.textLight}
+                color={FootballColors.textLight}
               />
             </TouchableOpacity>
           </View>
@@ -1036,7 +1077,7 @@ const ProfileScreen: React.FC = () => {
               <Ionicons
                 name={user.userType === "player" ? "football" : "business"}
                 size={14}
-                color={ImprovedColors.textLight}
+                color={FootballColors.textLight}
               />
               <Text style={styles.userTypeText}>
                 {user.userType === "player" ? "Jugador" : "Anfitrión"}
@@ -1048,18 +1089,16 @@ const ProfileScreen: React.FC = () => {
             <Ionicons
               name="pencil"
               size={20}
-              color={ImprovedColors.textLight}
+              color={FootballColors.textLight}
             />
           </TouchableOpacity>
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile Content */}
         {user.userType === "player" && renderPlayerProfile(user as Player)}
         {user.userType === "host" && renderHostProfile(user as Host)}
 
-        {/* Settings */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Configuración</Text>
 
@@ -1074,13 +1113,13 @@ const ProfileScreen: React.FC = () => {
                   value={notificationsEnabled}
                   onValueChange={setNotificationsEnabled}
                   trackColor={{
-                    false: ImprovedColors.border,
-                    true: ImprovedColors.primaryLight,
+                    false: FootballColors.border,
+                    true: FootballColors.primaryLight,
                   }}
                   thumbColor={
                     notificationsEnabled
-                      ? ImprovedColors.primary
-                      : ImprovedColors.textMuted
+                      ? FootballColors.primary
+                      : FootballColors.textMuted
                   }
                 />
               }
@@ -1096,13 +1135,13 @@ const ProfileScreen: React.FC = () => {
                   value={locationEnabled}
                   onValueChange={setLocationEnabled}
                   trackColor={{
-                    false: ImprovedColors.border,
-                    true: ImprovedColors.primaryLight,
+                    false: FootballColors.border,
+                    true: FootballColors.primaryLight,
                   }}
                   thumbColor={
                     locationEnabled
-                      ? ImprovedColors.primary
-                      : ImprovedColors.textMuted
+                      ? FootballColors.primary
+                      : FootballColors.textMuted
                   }
                 />
               }
@@ -1138,7 +1177,6 @@ const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Sección de Logout Mejorada */}
         <LogoutSection />
       </ScrollView>
     </SafeAreaView>
@@ -1148,7 +1186,7 @@ const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: ImprovedColors.background,
+    backgroundColor: FootballColors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -1176,12 +1214,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 3,
-    borderColor: ImprovedColors.textLight,
+    borderColor: FootballColors.textLight,
   },
   avatarText: {
     fontSize: 28,
     fontWeight: "bold",
-    color: ImprovedColors.textLight,
+    color: FootballColors.textLight,
   },
   editAvatarButton: {
     position: "absolute",
@@ -1190,11 +1228,11 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: ImprovedColors.accent,
+    backgroundColor: FootballColors.accent,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: ImprovedColors.textLight,
+    borderColor: FootballColors.textLight,
   },
   userInfo: {
     flex: 1,
@@ -1202,12 +1240,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 24,
     fontWeight: "bold",
-    color: ImprovedColors.textLight,
+    color: FootballColors.textLight,
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: ImprovedColors.textLight,
+    color: FootballColors.textLight,
     opacity: 0.9,
     marginBottom: 4,
   },
@@ -1218,7 +1256,7 @@ const styles = StyleSheet.create({
   },
   userTypeText: {
     fontSize: 14,
-    color: ImprovedColors.textLight,
+    color: FootballColors.textLight,
     opacity: 0.9,
   },
   editButton: {
@@ -1236,20 +1274,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 24,
     borderBottomWidth: 1,
-    borderBottomColor: ImprovedColors.divider,
+    borderBottomColor: FootballColors.divider,
   },
   sectionTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
     marginBottom: 20,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: FootballColors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
   },
   playerProfile: {},
 
   playerCardSectionHeader: {
-    top: 10,
     position: 'relative',
-    paddingVertical:24,
+    paddingVertical: 24,
     paddingHorizontal: 20,
     marginHorizontal: -20,
     marginTop: -24,
@@ -1274,7 +1317,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: ImprovedColors.primary,
+    backgroundColor: FootballColors.primary,
     opacity: 0.3,
     marginBottom: 6,
   },
@@ -1284,8 +1327,13 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
     opacity: 0.2,
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
   iconContainer: {
-    shadowColor: ImprovedColors.primary,
+    shadowColor: FootballColors.primary,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -1315,7 +1363,7 @@ const styles = StyleSheet.create({
   sectionTitleEnhanced: {
     fontSize: 16,
     fontWeight: '600',
-    color: ImprovedColors.textSecondary,
+    color: FootballColors.textSecondary,
     marginBottom: 2,
     letterSpacing: 0.5,
   },
@@ -1335,7 +1383,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 12,
-    color: ImprovedColors.textMuted,
+    color: FootballColors.textMuted,
     marginTop: 4,
     fontWeight: '500',
     letterSpacing: 0.3,
@@ -1351,7 +1399,7 @@ const styles = StyleSheet.create({
   decorativeLine: {
     height: 2,
     width: 24,
-    backgroundColor: ImprovedColors.primary,
+    backgroundColor: FootballColors.primary,
     opacity: 0.3,
     borderRadius: 1,
   },
@@ -1374,14 +1422,13 @@ const styles = StyleSheet.create({
     height: 2,
   },
 
-  // ESTILOS CORREGIDOS PARA LA TARJETA FIFA
   fifaCardContainer: {
     alignItems: "center",
     marginBottom: 10,
   },
   cardWrapper: {
     width: screenWidth - 60,
-    height: 380,
+    height: 420,
   },
   cardSide: {
     position: "absolute",
@@ -1389,32 +1436,87 @@ const styles = StyleSheet.create({
     height: "100%",
     backfaceVisibility: "hidden",
   },
-  cardBack: {},
   fifaCard: {
     width: "100%",
     height: "100%",
-    borderRadius: 16,
-    padding: 18,
+    borderRadius: 20,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 12,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 12,
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 15,
+    overflow: 'hidden',
+  },
+  cardPattern: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.1,
+  },
+  patternCircle1: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    top: -50,
+    right: -50,
+  },
+  patternCircle2: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    bottom: -20,
+    left: -20,
+  },
+  patternCircle3: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: 150,
+    left: 50,
   },
   fifaHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 18,
+    marginBottom: 16,
+    zIndex: 1,
+  },
+  cardTypeContainer: {
+    alignItems: 'center',
+  },
+  cardTypeText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    letterSpacing: 1.5,
+    opacity: 0.9,
+  },
+  cardStars: {
+    flexDirection: 'row',
+    marginTop: 2,
+    gap: 1,
   },
   ratingContainer: {
     alignItems: "center",
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   overallText: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: "900",
     color: "#FFFFFF",
     textShadowColor: "rgba(0, 0, 0, 0.8)",
@@ -1423,158 +1525,235 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   positionText: {
-    fontSize: 14,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "800",
     color: "#FFFFFF",
     opacity: 0.95,
-    marginTop: -4,
+    marginTop: -2,
     letterSpacing: 1,
   },
   playerAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2.5,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 3,
     borderColor: "#FFFFFF",
   },
+  avatarGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: "center",
+    alignItems: "center",
+  },
   avatarInitials: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#FFFFFF",
   },
+  clubLogo: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  logoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  clubName: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.8)',
+    letterSpacing: 1,
+  },
   playerNameContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
+    alignItems: 'center',
   },
   playerName: {
-    fontSize: 18,
-    fontWeight: "800",
+    fontSize: 16,
+    fontWeight: "900",
     color: "#FFFFFF",
     textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
     letterSpacing: 0.5,
-    lineHeight: 22,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  playerDetails: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   playerSubInfo: {
-    fontSize: 13,
+    fontSize: 10,
     color: "#FFFFFF",
-    opacity: 0.9,
-    marginTop: 4,
-    fontWeight: "500",
+    opacity: 0.8,
+    fontWeight: "600",
   },
   mainStats: {
     flex: 1,
-    justifyContent: "space-around",
-    paddingVertical: 0,
+    justifyContent: "center",
+    paddingVertical: 8,
   },
-  statsRow: {
+  statsGrid: {
+    gap: 12,
+  },
+  statPair: {
     flexDirection: "row",
     justifyContent: "space-around",
-    marginVertical: 6,
   },
   statItem: {
     alignItems: "center",
-    minWidth: 50,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    minWidth: 60,
   },
   statNumber: {
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 18,
+    fontWeight: "900",
     color: "#FFFFFF",
     textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
-    marginBottom: 3,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: "#FFFFFF",
     opacity: 0.9,
-    fontWeight: "700",
+    fontWeight: "800",
     letterSpacing: 0.5,
   },
   physicalInfo: {
     alignItems: "center",
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.2)",
+    marginTop: 8,
+  },
+  physicalStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  physicalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  physicalDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    marginHorizontal: 12,
   },
   physicalText: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#FFFFFF",
     opacity: 0.9,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   flipIndicator: {
     position: "absolute",
-    bottom: 12,
-    right: 16,
+    bottom: 16,
+    right: 20,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   flipText: {
-    fontSize: 10,
+    fontSize: 9,
     color: "rgba(255,255,255,0.7)",
-    fontWeight: "500",
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 
   // ESTILOS PARA EL REVERSO DE LA TARJETA
   backHeader: {
     alignItems: "center",
     marginBottom: 20,
-    paddingBottom: 12,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255, 255, 255, 0.2)",
   },
   backTitle: {
-    fontSize: 14,
-    fontWeight: "800",
+    fontSize: 12,
+    fontWeight: "900",
     color: "#FFFFFF",
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     textAlign: "center",
+    marginBottom: 6,
   },
   backSubtitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#FFFFFF",
-    opacity: 0.8,
-    marginTop: 3,
-    fontWeight: "600",
+    opacity: 0.9,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  overallBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  overallBadgeText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 1,
   },
   detailedStats: {
     flex: 1,
     justifyContent: "space-around",
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   statRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 4,
+    marginVertical: 6,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 8,
+    padding: 8,
   },
   detailStatLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#FFFFFF",
-    fontWeight: "600",
+    fontWeight: "700",
     width: 60,
   },
   statBarContainer: {
     flex: 1,
-    height: 6,
+    height: 8,
     backgroundColor: "rgba(255, 255, 255, 0.2)",
-    borderRadius: 3,
+    borderRadius: 4,
     marginHorizontal: 10,
     overflow: "hidden",
   },
   statBar: {
     height: "100%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 3,
+    borderRadius: 4,
   },
   detailStatValue: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#FFFFFF",
     fontWeight: "bold",
     width: 25,
@@ -1597,11 +1776,10 @@ const styles = StyleSheet.create({
     marginVertical: 1,
   },
 
-  // RESTO DE ESTILOS
   radarContainer: {
     alignItems: "center",
     marginVertical: 20,
-    backgroundColor: ImprovedColors.surface,
+    backgroundColor: FootballColors.surface,
     borderRadius: 24,
     padding: 24,
     shadowColor: "#000",
@@ -1628,14 +1806,15 @@ const styles = StyleSheet.create({
   statValueNumber: {
     fontSize: 20,
     fontWeight: "800",
-    color: ImprovedColors.primary,
+    color: FootballColors.primary,
   },
   statValueLabel: {
     fontSize: 12,
-    color: ImprovedColors.textMuted,
+    color: FootballColors.textMuted,
     marginTop: 4,
     fontWeight: "600",
   },
+
   statsContainer: {
     gap: 20,
     marginBottom: 20,
@@ -1651,25 +1830,61 @@ const styles = StyleSheet.create({
   statBarLabel: {
     fontSize: 16,
     fontWeight: "600",
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
   },
-  statValue: {
+  statValues: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  statValueBase: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: FootballColors.statsBase,
+  },
+  statValuePlus: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: FootballColors.statsGain,
+  },
+  statValueCurrent: {
     fontSize: 16,
     fontWeight: "bold",
-    color: ImprovedColors.primary,
+    color: FootballColors.textPrimary,
   },
   statTrack: {
-    height: 10,
-    backgroundColor: ImprovedColors.surface,
+    height: 12,
+    backgroundColor: FootballColors.surface,
     borderRadius: 6,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: ImprovedColors.border,
+    borderColor: FootballColors.border,
+    position: 'relative',
   },
-  statFill: {
+  statFillBase: {
+    position: 'absolute',
     height: "100%",
+    backgroundColor: FootballColors.statsBase,
     borderRadius: 5,
+    left: 0,
+    top: 0,
   },
+  statFillGain: {
+    position: 'absolute',
+    height: "100%",
+    backgroundColor: FootballColors.statsGain,
+    borderRadius: 5,
+    top: 0,
+  },
+  statIndicator: {
+    position: 'absolute',
+    width: 3,
+    height: '100%',
+    backgroundColor: FootballColors.textPrimary,
+    top: 0,
+    borderRadius: 2,
+  },
+
   infoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1677,11 +1892,11 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     width: "47%",
-    backgroundColor: ImprovedColors.surface,
+    backgroundColor: FootballColors.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: ImprovedColors.border,
+    borderColor: FootballColors.border,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1693,7 +1908,7 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: ImprovedColors.textMuted,
+    color: FootballColors.textMuted,
     fontWeight: "600",
     marginBottom: 6,
     textTransform: "uppercase",
@@ -1701,16 +1916,18 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 14,
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
     fontWeight: "700",
   },
+
+  // HOST PROFILE
   hostProfile: {},
   businessCard: {
-    backgroundColor: ImprovedColors.surface,
+    backgroundColor: FootballColors.surface,
     borderRadius: 20,
     padding: 24,
     borderWidth: 1,
-    borderColor: ImprovedColors.border,
+    borderColor: FootballColors.border,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1723,19 +1940,24 @@ const styles = StyleSheet.create({
   businessName: {
     fontSize: 22,
     fontWeight: "bold",
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
     marginBottom: 8,
   },
   businessAddress: {
     fontSize: 16,
-    color: ImprovedColors.textSecondary,
+    color: FootballColors.textSecondary,
     marginBottom: 12,
   },
   businessDescription: {
     fontSize: 14,
-    color: ImprovedColors.textSecondary,
+    color: FootballColors.textSecondary,
     lineHeight: 20,
     marginBottom: 16,
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   rating: {
     flexDirection: "row",
@@ -1745,21 +1967,21 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
   },
   reviewsText: {
     fontSize: 14,
-    color: ImprovedColors.textMuted,
+    color: FootballColors.textMuted,
   },
   fieldsContainer: {
     gap: 16,
   },
   fieldCard: {
-    backgroundColor: ImprovedColors.surface,
+    backgroundColor: FootballColors.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: ImprovedColors.border,
+    borderColor: FootballColors.border,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -1772,19 +1994,21 @@ const styles = StyleSheet.create({
   fieldName: {
     fontSize: 16,
     fontWeight: "600",
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
     marginBottom: 4,
   },
   fieldType: {
     fontSize: 14,
-    color: ImprovedColors.primary,
+    color: FootballColors.primary,
     fontWeight: "500",
     marginBottom: 8,
   },
   fieldPrice: {
     fontSize: 14,
-    color: ImprovedColors.textSecondary,
+    color: FootballColors.textSecondary,
   },
+
+  // PROFILE OPTIONS
   optionsContainer: {
     gap: 0,
   },
@@ -1794,7 +2018,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: ImprovedColors.divider,
+    borderBottomColor: FootballColors.divider,
   },
   optionLeft: {
     flexDirection: "row",
@@ -1805,7 +2029,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: ImprovedColors.primaryLight,
+    backgroundColor: FootballColors.primaryLight,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -1816,12 +2040,12 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
     marginBottom: 2,
   },
   optionSubtitle: {
     fontSize: 14,
-    color: ImprovedColors.textSecondary,
+    color: FootballColors.textSecondary,
   },
   optionRight: {
     flexDirection: "row",
@@ -1829,14 +2053,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
 
-  // ESTILOS PARA LA SECCIÓN DE LOGOUT MEJORADA
+  // LOGOUT SECTION
   logoutSection: {
     paddingHorizontal: 20,
     paddingVertical: 24,
-    backgroundColor: ImprovedColors.background,
+    backgroundColor: FootballColors.background,
   },
-  
-  // Header de la sección
   logoutHeader: {
     marginBottom: 20,
   },
@@ -1849,22 +2071,20 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(237, 137, 54, 0.1)',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoutHeaderTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
     marginBottom: 2,
   },
   logoutHeaderSubtitle: {
     fontSize: 14,
-    color: ImprovedColors.textSecondary,
+    color: FootballColors.textSecondary,
   },
-
-  // Cards de acciones de seguridad
   securityActions: {
     gap: 12,
     marginBottom: 24,
@@ -1882,14 +2102,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: ImprovedColors.surface,
+    backgroundColor: FootballColors.surface,
     gap: 12,
   },
   securityCardIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(72, 187, 120, 0.1)',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1899,21 +2119,19 @@ const styles = StyleSheet.create({
   securityCardTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: ImprovedColors.textPrimary,
+    color: FootballColors.textPrimary,
     marginBottom: 2,
   },
   securityCardSubtitle: {
     fontSize: 14,
-    color: ImprovedColors.textSecondary,
+    color: FootballColors.textSecondary,
   },
-
-  // Botón de logout principal
   logoutButton: {
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 20,
     elevation: 8,
-    shadowColor: '#E53E3E',
+    shadowColor: '#DC2626',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -1981,14 +2199,18 @@ const styles = StyleSheet.create({
     top: 12,
     gap: 4,
   },
-
-  // Footer informativo
+  decorationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
   logoutFooter: {
-    backgroundColor: ImprovedColors.surface,
+    backgroundColor: FootballColors.surface,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: ImprovedColors.border,
+    borderColor: FootballColors.border,
   },
   footerContent: {
     flexDirection: 'row',
@@ -1999,7 +2221,7 @@ const styles = StyleSheet.create({
   footerText: {
     flex: 1,
     fontSize: 13,
-    color: ImprovedColors.textMuted,
+    color: FootballColors.textMuted,
     lineHeight: 18,
   },
   footerAction: {
@@ -2007,7 +2229,7 @@ const styles = StyleSheet.create({
   },
   footerActionText: {
     fontSize: 14,
-    color: ImprovedColors.primary,
+    color: FootballColors.primary,
     fontWeight: '600',
   },
 });

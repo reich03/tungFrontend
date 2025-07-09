@@ -12,6 +12,8 @@ import {
   Platform,
   Image,
   Dimensions,
+  Modal,
+  TextInput,
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,13 +27,12 @@ import {
   AuthStackParamList,
   PlayerRegistrationForm,
   PlayerPosition,
-  Player,
 } from "../../types";
 import { Colors } from "../../constants/Colors";
 import { useAuth } from "../../context/AuthContext";
 import CustomButton from "../../components/common/CustomButton";
 import CustomInput from "../../components/common/CustomInput";
-
+import { playerService } from "../../services/playerService";
 type PlayerRegistrationScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
   "PlayerRegistration"
@@ -184,8 +185,9 @@ const colombianDepartments = [
 const positions: { value: PlayerPosition; label: string; emoji: string }[] = [
   { value: "goalkeeper", label: "Arquero", emoji: "🥅" },
   { value: "defender", label: "Defensa", emoji: "🛡️" },
-  { value: "midfielder", label: "Medio", emoji: "⚡" },
+  { value: "midfielder", label: "CENTROCAMPISTA", emoji: "⚡" },
   { value: "forward", label: "Delantero", emoji: "⚽" },
+  { value: "shuttlecock", label: "VOLANTE", emoji: "⚽" },
 ];
 
 const goalkeeperStats = [
@@ -267,6 +269,14 @@ const schema = yup.object().shape({
   documentType: yup.string().required("Selecciona el tipo de documento"),
   documentNumber: yup.string().required("El número de documento es requerido"),
   email: yup.string().email("Email inválido").required("El email es requerido"),
+  password: yup
+    .string()
+    .min(6, "La contraseña debe tener al menos 6 caracteres")
+    .required("La contraseña es requerida"),
+  confirmPassword: yup
+    .string()
+    .oneOf([yup.ref("password")], "Las contraseñas deben coincidir")
+    .required("Confirma tu contraseña"),
   phone: yup.string().required("El teléfono es requerido"),
   gender: yup.string().required("Selecciona el género"),
   birthDate: yup.date().required("La fecha de nacimiento es requerida"),
@@ -279,7 +289,7 @@ const schema = yup.object().shape({
 });
 
 const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
-  const { updateUser } = useAuth();
+  const { registerPlayer } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -290,15 +300,19 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
   const [alternativePositions, setAlternativePositions] = useState<
     PlayerPosition[]
   >([]);
+
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+
   const [stats, setStats] = useState({
-    // Arquero
     reach: 30,
     saves: 30,
     reflexes: 30,
     speed: 30,
     throw: 30,
     positioning: 30,
-    // Jugador
     pace: 30,
     shooting: 30,
     passing: 30,
@@ -321,6 +335,8 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
       documentType: "cedula",
       documentNumber: "",
       email: "",
+      password: "",
+      confirmPassword: "",
       phone: "",
       gender: "male",
       department: "",
@@ -336,7 +352,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
   const watchedBirthDate = watch("birthDate");
   const watchedDepartment = watch("department");
 
-  // Verificar si es menor de 15 años
   React.useEffect(() => {
     if (watchedBirthDate) {
       const today = new Date();
@@ -360,7 +375,12 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync(); 
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedImage = result.assets[0].uri;
@@ -390,6 +410,45 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
       ...prev,
       [statKey]: Math.max(0, Math.min(60, value)),
     }));
+  };
+
+  const handleEmailVerification = async () => {
+    if (!verificationCode.trim()) {
+      Alert.alert("Error", "Ingresa el código de verificación");
+      return;
+    }
+
+    try {
+      setIsVerifying(true);
+
+      const result = await playerService.verifyPlayerEmail(verificationCode);
+
+      if (result.success) {
+        setShowVerificationModal(false);
+        Alert.alert(
+          "¡Cuenta verificada! 🎉",
+          "Tu email ha sido verificado exitosamente. ¡Ya puedes iniciar sesión!",
+          [
+            {
+              text: "Iniciar sesión",
+              onPress: () => {
+                navigation.navigate("Login");
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Error", result.message);
+      }
+    } catch (error) {
+      console.error("Error verifying email:", error);
+      Alert.alert(
+        "Error",
+        "No se pudo verificar el código. Intenta nuevamente."
+      );
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const StatSlider: React.FC<{
@@ -437,7 +496,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  // Step Indicator
   const StepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
       {[1, 2, 3, 4, 5].map((step) => (
@@ -475,7 +533,73 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  // STEP 1: Información Personal
+  const VerificationModal = () => (
+    <Modal
+      visible={showVerificationModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowVerificationModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Ionicons name="mail-outline" size={48} color={Colors.primary} />
+            <Text style={styles.modalTitle}>Verificar Email</Text>
+            <Text style={styles.modalSubtitle}>
+              Hemos enviado un código de verificación a:
+            </Text>
+            <Text style={styles.modalEmail}>{userEmail}</Text>
+          </View>
+
+          <View style={styles.modalContent}>
+            <Text style={styles.verificationLabel}>Código de verificación</Text>
+            <TextInput
+              style={styles.verificationInput}
+              placeholder="Ej: 123456"
+              value={verificationCode}
+              onChangeText={setVerificationCode}
+              keyboardType="numeric"
+              maxLength={6}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalSecondaryButton}
+                onPress={() => setShowVerificationModal(false)}
+              >
+                <Text style={styles.modalSecondaryButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalPrimaryButton,
+                  isVerifying && styles.modalButtonDisabled,
+                ]}
+                onPress={handleEmailVerification}
+                disabled={isVerifying}
+              >
+                {isVerifying ? (
+                  <Text style={styles.modalPrimaryButtonText}>
+                    Verificando...
+                  </Text>
+                ) : (
+                  <Text style={styles.modalPrimaryButtonText}>Verificar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalHint}>
+              ¿No recibiste el código? Revisa tu carpeta de spam o espera unos
+              minutos.
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -485,7 +609,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         </Text>
       </View>
 
-      {/* Foto de perfil */}
       <View style={styles.photoSection}>
         <Text style={styles.sectionTitle}>📸 Foto de perfil</Text>
         <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
@@ -504,7 +627,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Información básica */}
       <View style={styles.formContainer}>
         <View style={styles.nameRow}>
           <Controller
@@ -541,7 +663,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
           />
         </View>
 
-        {/* Tipo de documento */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>📋 Tipo de documento</Text>
           <View style={styles.documentTypes}>
@@ -607,6 +728,42 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
 
         <Controller
           control={control}
+          name="password"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <CustomInput
+              label="Contraseña"
+              placeholder="••••••••"
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              error={errors.password?.message}
+              secureTextEntry
+              leftIcon="lock-closed-outline"
+              required
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="confirmPassword"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <CustomInput
+              label="Confirmar contraseña"
+              placeholder="••••••••"
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              error={errors.confirmPassword?.message}
+              secureTextEntry
+              leftIcon="lock-closed-outline"
+              required
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
           name="phone"
           render={({ field: { onChange, onBlur, value } }) => (
             <CustomInput
@@ -626,7 +783,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  // STEP 2: Género, Fecha y Ubicación
   const renderStep2 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -636,7 +792,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         </Text>
       </View>
 
-      {/* Género */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>🚹🚺 Género</Text>
         <View style={styles.genderContainer}>
@@ -664,7 +819,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Fecha de nacimiento */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>📅 Fecha de nacimiento</Text>
         <TouchableOpacity
@@ -694,7 +848,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
           />
         )}
 
-        {/* Advertencia para menores */}
         {isUnderage && (
           <View style={styles.warningContainer}>
             <Ionicons name="warning-outline" size={24} color={Colors.warning} />
@@ -735,7 +888,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         )}
       </View>
 
-      {/* Ubicación */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>📍 Ubicación</Text>
 
@@ -802,7 +954,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  // STEP 3: Nickname y Posición
   const renderStep3 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -812,7 +963,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         </Text>
       </View>
 
-      {/* Nickname */}
       <Controller
         control={control}
         name="nickname"
@@ -830,7 +980,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         )}
       />
 
-      {/* Posición principal */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>⭐ Posición principal</Text>
         <View style={styles.positionsGrid}>
@@ -857,7 +1006,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Posiciones alternativas */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
           🔄 Otras posiciones donde puedes jugar
@@ -902,7 +1050,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  // STEP 4: Datos físicos
   const renderStep4 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
@@ -964,7 +1111,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  // STEP 5: Autoevaluación
   const renderStep5 = () => (
     <View style={styles.stepContainer}>
       {/* NOTIFICACIÓN IMPORTANTE */}
@@ -1014,7 +1160,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
             ))}
       </View>
 
-      {/* Resumen de stats */}
       <View style={styles.statsummary}>
         <Text style={styles.summaryTitle}>📊 Resumen</Text>
         <Text style={styles.summaryText}>
@@ -1031,89 +1176,279 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     </View>
   );
 
-  const canContinue = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          watch("firstName") &&
-          watch("lastName") &&
-          watch("email") &&
-          watch("phone")
-        );
-      case 2:
-        return (
-          watch("gender") &&
-          watchedBirthDate &&
-          watch("department") &&
-          watch("city")
-        );
-      case 3:
-        return watch("nickname") && watch("position");
-      case 4:
-        return watch("height") && watch("weight");
-      case 5:
-        return true;
-      default:
-        return false;
-    }
-  };
+  // const canContinue = () => {
+  //   switch (currentStep) {
+  //     case 1:
+  //       return (
+  //         watch("firstName") &&
+  //         watch("lastName") &&
+  //         watch("email") &&
+  //         watch("password") &&
+  //         watch("confirmPassword") &&
+  //         watch("phone")
+  //       );
+  //     case 2:
+  //       return (
+  //         watch("gender") &&
+  //         watchedBirthDate &&
+  //         watch("department") &&
+  //         watch("city")
+  //       );
+  //     case 3:
+  //       return watch("nickname") && watch("position");
+  //     case 4:
+  //       return watch("height") && watch("weight");
+  //     case 5:
+  //       return true;
+  //     default:
+  //       return false;
+  //   }
+  // };
+
+  // const onSubmit = async (data: PlayerRegistrationForm) => {
+  //   try {
+  //     setIsLoading(true);
+
+  //     console.log("🚀 Enviando datos del jugador:", data.nickname);
+
+  //     // Usar el servicio con validación completa
+  //     const result = await playerService.createPlayerWithValidation(
+  //       data,
+  //       stats,
+  //       profileImage || undefined
+  //     );
+
+  //     if (result.success) {
+  //       // Guardar email para verificación
+  //       setUserEmail(data.email);
+
+  //       // Mostrar modal de verificación
+  //       setShowVerificationModal(true);
+
+  //       Alert.alert(
+  //         "¡Registro exitoso! 📧",
+  //         `Hemos enviado un código de verificación a ${data.email}. Revisa tu bandeja de entrada.`,
+  //         [{ text: "OK" }]
+  //       );
+  //     } else {
+  //       Alert.alert("Error al crear cuenta", result.message, [{ text: "OK" }]);
+  //     }
+  //   } catch (error) {
+  //     console.error("❌ Error en registro:", error);
+  //     Alert.alert(
+  //       "Error",
+  //       "Hubo un problema al crear tu perfil. Intenta nuevamente.",
+  //       [{ text: "OK" }]
+  //     );
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   const onSubmit = async (data: PlayerRegistrationForm) => {
+    console.log("🔥 onSubmit INICIADO - Datos recibidos:", {
+      nickname: data.nickname,
+      email: data.email,
+      position: data.position,
+      hasProfileImage: !!profileImage,
+    });
+
     try {
       setIsLoading(true);
+      console.log("⏳ Loading state activado");
 
-      const playerData: Partial<Player> = {
-        ...data,
-        userType: "player",
-        profileImage,
-        alternativePositions,
-        stats:
-          watchedPosition === "goalkeeper"
-            ? {
-                reach: stats.reach,
-                saves: stats.saves,
-                reflexes: stats.reflexes,
-                speed: stats.speed,
-                throw: stats.throw,
-                positioning: stats.positioning,
-              }
-            : {
-                pace: stats.pace,
-                shooting: stats.shooting,
-                passing: stats.passing,
-                dribbling: stats.dribbling,
-                defending: stats.defending,
-                physical: stats.physical,
-              },
-        isUnderage,
-        isForSponsored,
-      };
-
-      await updateUser(playerData);
-
-      Alert.alert(
-        "¡Bienvenido a TUNG! 🎉",
-        "Tu perfil de jugador ha sido creado exitosamente. ¡Ya puedes empezar a buscar partidos!",
-        [
-          {
-            text: "Comenzar",
-            onPress: () => {
-              // La navegación se manejará automáticamente por el AuthContext
-            },
-          },
-        ]
+      console.log("🚀 Enviando datos del jugador:", data.nickname);
+      console.log("📊 Stats actuales:", stats);
+      console.log(
+        "📸 Profile image:",
+        profileImage ? "Presente" : "No hay imagen"
       );
+
+      if (!data.email || !data.password || !data.nickname) {
+        console.error("❌ Faltan campos obligatorios:", {
+          email: !!data.email,
+          password: !!data.password,
+          nickname: !!data.nickname,
+        });
+        Alert.alert(
+          "Error",
+          "Por favor completa todos los campos obligatorios"
+        );
+        return;
+      }
+
+      console.log("✅ Validación manual pasó, llamando al servicio...");
+
+      const result = await playerService.createPlayerWithValidation(
+        data,
+        stats,
+        profileImage || undefined
+      );
+
+      console.log("📨 Respuesta del servicio recibida:", {
+        success: result.success,
+        message: result.message,
+        hasData: !!result.data,
+        errors: result.errors,
+      });
+
+      if (result.success) {
+        console.log("🎉 Registro exitoso, mostrando modal de verificación");
+
+        setUserEmail(data.email);
+
+        setShowVerificationModal(true);
+
+        Alert.alert(
+          "¡Registro exitoso! 📧",
+          `Hemos enviado un código de verificación a ${data.email}. Revisa tu bandeja de entrada.`,
+          [{ text: "OK" }]
+        );
+      } else {
+        console.error(
+          "❌ Error en el servicio:",
+          result.message,
+          result.errors
+        );
+        Alert.alert(
+          "Error al crear cuenta",
+          result.message +
+            (result.errors ? `\n\nDetalles:\n${result.errors.join("\n")}` : ""),
+          [{ text: "OK" }]
+        );
+      }
     } catch (error) {
+      console.error("💥 ERROR CRÍTICO en onSubmit:", error);
+
+      if (error instanceof Error) {
+        console.error("💥 Error stack:", error.stack);
+        console.error("💥 Error message:", error.message);
+      }
+
       Alert.alert(
-        "Error",
-        "Hubo un problema al crear tu perfil. Intenta nuevamente.",
+        "Error Crítico",
+        `Hubo un problema inesperado al crear tu perfil:\n\n${
+          error instanceof Error ? error.message : "Error desconocido"
+        }\n\nIntenta nuevamente.`,
         [{ text: "OK" }]
       );
     } finally {
+      console.log("🏁 onSubmit FINALIZADO - Desactivando loading");
       setIsLoading(false);
     }
   };
 
+  const canContinue = () => {
+    const result = (() => {
+      switch (currentStep) {
+        case 1:
+          const step1Valid = !!(
+            watch("firstName") &&
+            watch("lastName") &&
+            watch("email") &&
+            watch("password") &&
+            watch("confirmPassword") &&
+            watch("phone")
+          );
+          console.log("🔍 Step 1 validation:", {
+            firstName: !!watch("firstName"),
+            lastName: !!watch("lastName"),
+            email: !!watch("email"),
+            password: !!watch("password"),
+            confirmPassword: !!watch("confirmPassword"),
+            phone: !!watch("phone"),
+            result: step1Valid,
+          });
+          return step1Valid;
+
+        case 2:
+          const step2Valid = !!(
+            watch("gender") &&
+            watchedBirthDate &&
+            watch("department") &&
+            watch("city")
+          );
+          console.log("🔍 Step 2 validation:", {
+            gender: !!watch("gender"),
+            birthDate: !!watchedBirthDate,
+            department: !!watch("department"),
+            city: !!watch("city"),
+            result: step2Valid,
+          });
+          return step2Valid;
+
+        case 3:
+          const step3Valid = !!(watch("nickname") && watch("position"));
+          console.log("🔍 Step 3 validation:", {
+            nickname: !!watch("nickname"),
+            position: !!watch("position"),
+            result: step3Valid,
+          });
+          return step3Valid;
+
+        case 4:
+          const step4Valid = !!(watch("height") && watch("weight"));
+          console.log("🔍 Step 4 validation:", {
+            height: !!watch("height"),
+            weight: !!watch("weight"),
+            result: step4Valid,
+          });
+          return step4Valid;
+
+        case 5:
+          return true;
+
+        default:
+          return false;
+      }
+    })();
+
+    console.log(`🎯 canContinue() para step ${currentStep}:`, result);
+    return result;
+  };
+
+  const handleCreateProfile = () => {
+    console.log("🎯 BOTÓN PRESIONADO - Crear perfil");
+    console.log("📊 TODOS LOS DATOS DEL FORMULARIO:", watch());
+
+    console.log("📋 Estado actual:", {
+      currentStep,
+      isLoading,
+      canContinue: canContinue(),
+      formErrors: Object.keys(errors).length > 0 ? errors : "Sin errores",
+    });
+
+    if (currentStep !== 5) {
+      console.error("❌ No estamos en el step 5, step actual:", currentStep);
+      Alert.alert("Error", "Debes completar todos los pasos anteriores");
+      return;
+    }
+
+    if (Object.keys(errors).length > 0) {
+      console.error("❌ Hay errores de validación:", errors);
+      Alert.alert("Error", "Por favor corrige los errores en el formulario");
+      return;
+    }
+
+    console.log("✅ Pre-validaciones pasaron, llamando a handleSubmit");
+
+    handleSubmit(
+      (data) => {
+        console.log("✅ handleSubmit SUCCESS callback ejecutado");
+        onSubmit(data);
+      },
+      (errors) => {
+        console.error("❌ handleSubmit ERROR callback ejecutado:", errors);
+        Alert.alert(
+          "Error de Validación",
+          "Hay errores en el formulario:\n\n" +
+            Object.values(errors)
+              .map((error) => error.message)
+              .join("\n")
+        );
+      }
+    )();
+  };
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
@@ -1122,7 +1457,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -1144,7 +1478,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Step Indicator */}
         <StepIndicator />
 
         <ScrollView
@@ -1159,7 +1492,6 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
           {currentStep === 5 && renderStep5()}
         </ScrollView>
 
-        {/* Footer */}
         <View style={styles.footer}>
           <View style={styles.footerButtons}>
             {currentStep < 5 ? (
@@ -1172,7 +1504,7 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
             ) : (
               <CustomButton
                 title="🎉 Crear perfil"
-                onPress={handleSubmit(onSubmit)}
+                onPress={handleCreateProfile}
                 loading={isLoading}
                 fullWidth
                 disabled={!canContinue()}
@@ -1180,6 +1512,8 @@ const PlayerRegistrationScreen: React.FC<Props> = ({ navigation }) => {
             )}
           </View>
         </View>
+
+        <VerificationModal />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1224,8 +1558,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
   },
-
-  // Step Indicator
   stepIndicatorContainer: {
     flexDirection: "row",
     justifyContent: "center",
@@ -1273,7 +1605,6 @@ const styles = StyleSheet.create({
   stepLineActive: {
     backgroundColor: Colors.primary,
   },
-
   scrollView: {
     flex: 1,
   },
@@ -1301,8 +1632,6 @@ const styles = StyleSheet.create({
   formContainer: {
     gap: 16,
   },
-
-  // Foto de perfil
   photoSection: {
     alignItems: "center",
     marginBottom: 24,
@@ -1342,8 +1671,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textMuted,
   },
-
-  // Nombres
   nameRow: {
     flexDirection: "row",
     gap: 12,
@@ -1351,13 +1678,9 @@ const styles = StyleSheet.create({
   nameInput: {
     flex: 1,
   },
-
-  // Secciones
   section: {
     marginBottom: 24,
   },
-
-  // Tipos de documento
   documentTypes: {
     gap: 8,
   },
@@ -1382,8 +1705,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: "600",
   },
-
-  // Género
   genderContainer: {
     flexDirection: "row",
     gap: 12,
@@ -1413,8 +1734,6 @@ const styles = StyleSheet.create({
   genderLabelSelected: {
     color: Colors.primary,
   },
-
-  // Fecha
   dateButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1429,8 +1748,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textPrimary,
   },
-
-  // Advertencia de menores
   warningContainer: {
     marginTop: 16,
     backgroundColor: Colors.warning,
@@ -1486,8 +1803,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     textAlign: "center",
   },
-
-  // Ubicación
   locationContainer: {
     gap: 16,
   },
@@ -1551,8 +1866,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: "600",
   },
-
-  // Posiciones
   positionsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1583,8 +1896,6 @@ const styles = StyleSheet.create({
   positionLabelSelected: {
     color: Colors.primary,
   },
-
-  // Posiciones alternativas
   alternativePositions: {
     gap: 8,
   },
@@ -1615,8 +1926,6 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: "600",
   },
-
-  // Físicos
   physicalContainer: {
     flexDirection: "row",
     gap: 16,
@@ -1642,8 +1951,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: "500",
   },
-
-  // Notificación importante
   importantNotice: {
     backgroundColor: "#9D0000",
     borderRadius: 16,
@@ -1668,8 +1975,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 20,
   },
-
-  // Stats mejorados
   statsContainer: {
     gap: 20,
   },
@@ -1736,8 +2041,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
   },
-
-  // Resumen de stats
   statsummary: {
     backgroundColor: Colors.primaryLight,
     borderRadius: 12,
@@ -1755,7 +2058,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textPrimary,
   },
-
   footer: {
     position: "absolute",
     bottom: 0,
@@ -1770,6 +2072,103 @@ const styles = StyleSheet.create({
   footerButtons: {
     flexDirection: "row",
     gap: 12,
+  },
+
+  // Estilos del modal de verificación
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: Colors.background,
+    borderRadius: 20,
+    margin: 20,
+    width: width * 0.9,
+    maxWidth: 400,
+  },
+  modalHeader: {
+    alignItems: "center",
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: Colors.textPrimary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  modalEmail: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.primary,
+  },
+  modalContent: {
+    padding: 24,
+  },
+  verificationLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  verificationInput: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    textAlign: "center",
+    letterSpacing: 4,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+  },
+  modalSecondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textSecondary,
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+  },
+  modalButtonDisabled: {
+    backgroundColor: Colors.textMuted,
+  },
+  modalPrimaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "white",
+  },
+  modalHint: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: "center",
+    lineHeight: 20,
   },
 });
 

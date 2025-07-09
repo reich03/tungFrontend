@@ -12,6 +12,8 @@ import {
   Platform,
   Image,
   Dimensions,
+  Modal,
+  TextInput,
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,17 +24,14 @@ import { useForm, Controller } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import MapView, { Marker } from "react-native-maps";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
-import {
-  AuthStackParamList,
-  HostRegistrationForm,
-  Host,
-  FieldType,
-} from "../../types";
+import { AuthStackParamList } from "../../types";
+import { ExtendedHostRegistrationForm } from "../../types/hostTypes";
 import { Colors } from "../../constants/Colors";
-import { useAuth } from "../../context/AuthContext";
 import CustomButton from "../../components/common/CustomButton";
 import CustomInput from "../../components/common/CustomInput";
+import { hostService } from "../../services/hostService";
 
 type HostRegistrationScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -43,60 +42,12 @@ interface Props {
   navigation: HostRegistrationScreenNavigationProp;
 }
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
-const fieldTypes: {
-  value: FieldType;
-  label: string;
-  capacity: number;
-  emoji: string;
-  color: string;
-  gradient: string[];
-}[] = [
-  {
-    value: "futbol5",
-    label: "Fútbol 5",
-    capacity: 10,
-    emoji: "⚽",
-    color: "#4CAF50",
-    gradient: ["#4CAF50", "#81C784"],
-  },
-  {
-    value: "futbol7",
-    label: "Fútbol 7",
-    capacity: 14,
-    emoji: "🥅",
-    color: "#FF9800",
-    gradient: ["#FF9800", "#FFB74D"],
-  },
-  {
-    value: "futbol11",
-    label: "Fútbol 11",
-    capacity: 22,
-    emoji: "🏟️",
-    color: "#2196F3",
-    gradient: ["#2196F3", "#64B5F6"],
-  },
-];
-
-const facilityServices = [
-  { key: "parking", label: "Parqueaderos", icon: "car-outline" },
-  { key: "bathrooms", label: "Baños", icon: "business-outline" },
-  { key: "security_cameras", label: "Cámaras de seguridad", icon: "videocam-outline" },
-  { key: "private_security", label: "Vigilancia privada", icon: "shield-outline" },
-  { key: "lockers", label: "Vestier", icon: "lock-closed-outline" },
-  { key: "cafeteria", label: "Cafetería", icon: "cafe-outline" },
-  { key: "pos_terminal", label: "Datáfono", icon: "card-outline" },
-  { key: "wifi", label: "WiFi", icon: "wifi-outline" },
-  { key: "camera_360", label: "Cámara 360", icon: "camera-outline" },
-  { key: "trackman", label: "Trackman", icon: "analytics-outline" },
-  { key: "tvs", label: "Televisores", icon: "tv-outline" },
-  { key: "stands", label: "Tribunas", icon: "people-outline" },
-  { key: "covered_fields", label: "Canchas techadas", icon: "umbrella-outline" },
-  { key: "synthetic_grass", label: "Pasto sintético", icon: "leaf-outline" },
-  { key: "natural_grass", label: "Pasto natural", icon: "flower-outline" },
-  { key: "rubber_floor", label: "Piso de goma", icon: "fitness-outline" },
-  { key: "restaurant", label: "Restaurante", icon: "restaurant-outline" },
+const genders = [
+  { value: "male", label: "Masculino", emoji: "👨" },
+  { value: "female", label: "Femenino", emoji: "👩" },
+  { value: "other", label: "Otro", emoji: "👤" },
 ];
 
 const schema = yup.object().shape({
@@ -112,45 +63,62 @@ const schema = yup.object().shape({
     .string()
     .required("La descripción es requerida")
     .min(20, "Mínimo 20 caracteres"),
-  adminName: yup
-    .string()
-    .required("El nombre del administrador es requerido"),
+  adminName: yup.string().required("El nombre del administrador es requerido"),
   adminEmail: yup
     .string()
     .email("Email inválido")
     .required("El email es requerido"),
-  nit: yup
+  adminPassword: yup
     .string()
-    .required("El NIT es requerido"),
-  contactInfo: yup.object().shape({
-    whatsapp: yup.string(),
-    instagram: yup.string(),
-    facebook: yup.string(),
-  }),
+    .min(6, "La contraseña debe tener al menos 6 caracteres")
+    .required("La contraseña es requerida"),
+  adminConfirmPassword: yup
+    .string()
+    .oneOf([yup.ref("adminPassword")], "Las contraseñas deben coincidir")
+    .required("Confirma tu contraseña"),
+  adminPhone: yup.string().required("El teléfono es requerido"),
+  adminDocumentNumber: yup
+    .string()
+    .required("El documento de identidad es requerido"),
+  nit: yup.string().required("El NIT es requerido"),
+  razonSocial: yup
+    .string()
+    .required("La razón social es requerida")
+    .min(3, "Mínimo 3 caracteres"),
+  openTime: yup.string().required("Hora de apertura requerida"),
+  closeTime: yup.string().required("Hora de cierre requerida"),
 });
 
 const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
-  const { updateUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [businessImages, setBusinessImages] = useState<string[]>([]);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [location, setLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
-  const [fields, setFields] = useState<any[]>([]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+
   const [documents, setDocuments] = useState({
-    bankCertification: null,
-    representativeId: null,
+    rut: null as any,
+    camaraComercio: null as any,
+    certificacionBancaria: null as any,
+    cedulaRepresentanteLegal: null as any,
   });
-  const [services, setServices] = useState<{[key: string]: boolean}>({});
 
   const {
     control,
     handleSubmit,
     formState: { errors },
     watch,
-  } = useForm<HostRegistrationForm>({
+    setValue,
+  } = useForm<ExtendedHostRegistrationForm>({
     resolver: yupResolver(schema),
     defaultValues: {
       businessName: "",
@@ -158,7 +126,18 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
       description: "",
       adminName: "",
       adminEmail: "",
+      adminPassword: "",
+      adminConfirmPassword: "",
+      adminPhone: "",
+      adminGender: "male",
+      adminDocumentNumber: "",
       nit: "",
+      businessEmail: "",
+      billingEmail: "",
+      businessPhone: "",
+      razonSocial: "",
+      openTime: "06:00",
+      closeTime: "23:00",
       contactInfo: {
         whatsapp: "",
         instagram: "",
@@ -167,7 +146,114 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     },
   });
 
-  // Funciones existentes (requestLocationPermission, pickImages, etc.)
+  const watchedBirthDate = watch("adminBirthDate");
+
+  const handleEmailVerification = async () => {
+    if (!verificationCode.trim()) {
+      Alert.alert("Error", "Ingresa el código de verificación");
+      return;
+    }
+
+    try {
+      setIsVerifying(true);
+
+      const result = await hostService.verifyHostEmail(verificationCode);
+
+      if (result.success) {
+        setShowVerificationModal(false);
+        Alert.alert(
+          "¡Cuenta verificada! 🎉",
+          "Tu email ha sido verificado exitosamente. ¡Ya puedes iniciar sesión como anfitrión!",
+          [
+            {
+              text: "Iniciar sesión",
+              onPress: () => {
+                navigation.navigate("Login");
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Error", result.message);
+      }
+    } catch (error) {
+      console.error("Error verifying email:", error);
+      Alert.alert(
+        "Error",
+        "No se pudo verificar el código. Intenta nuevamente."
+      );
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const VerificationModal = () => (
+    <Modal
+      visible={showVerificationModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowVerificationModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Ionicons name="mail-outline" size={48} color={Colors.primary} />
+            <Text style={styles.modalTitle}>Verificar Email</Text>
+            <Text style={styles.modalSubtitle}>
+              Hemos enviado un código de verificación a:
+            </Text>
+            <Text style={styles.modalEmail}>{userEmail}</Text>
+          </View>
+
+          <View style={styles.modalContent}>
+            <Text style={styles.verificationLabel}>Código de verificación</Text>
+            <TextInput
+              style={styles.verificationInput}
+              placeholder="Ej: 123456"
+              value={verificationCode}
+              onChangeText={setVerificationCode}
+              keyboardType="numeric"
+              maxLength={6}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalSecondaryButton}
+                onPress={() => setShowVerificationModal(false)}
+              >
+                <Text style={styles.modalSecondaryButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalPrimaryButton,
+                  isVerifying && styles.modalButtonDisabled,
+                ]}
+                onPress={handleEmailVerification}
+                disabled={isVerifying}
+              >
+                {isVerifying ? (
+                  <Text style={styles.modalPrimaryButtonText}>
+                    Verificando...
+                  </Text>
+                ) : (
+                  <Text style={styles.modalPrimaryButtonText}>Verificar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalHint}>
+              ¿No recibiste el código? Revisa tu carpeta de spam o espera unos
+              minutos.
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const requestLocationPermission = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -211,7 +297,12 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync();
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
 
       if (!result.canceled) {
         const newImage = result.assets[0].uri;
@@ -223,7 +314,41 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const pickDocument = async (type: 'bankCertification' | 'representativeId') => {
+  const pickProfileImage = async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Permisos de galería",
+          "Necesitamos acceso a tu galería para agregar tu foto de perfil.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = result.assets[0].uri;
+        setProfileImage(selectedImage);
+      }
+    } catch (error) {
+      console.error("Error al seleccionar la imagen:", error);
+      Alert.alert(
+        "Error",
+        "No pudimos acceder a tus fotos. Intenta nuevamente."
+      );
+    }
+  };
+
+  const pickDocument = async (type: keyof typeof documents) => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/pdf", "image/*"],
@@ -231,9 +356,9 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
       });
 
       if (!result.canceled) {
-        setDocuments(prev => ({
+        setDocuments((prev) => ({
           ...prev,
-          [type]: result.assets[0]
+          [type]: result.assets[0],
         }));
       }
     } catch (error) {
@@ -241,51 +366,9 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const addField = () => {
-    setFields([
-      ...fields,
-      {
-        id: Date.now().toString(),
-        name: "",
-        type: "futbol5" as FieldType,
-        pricePerHour: 50000,
-        hasLighting: false,
-        isIndoor: false,
-        amenities: [],
-      },
-    ]);
-  };
-
-  const updateField = (index: number, updates: any) => {
-    const updatedFields = [...fields];
-    updatedFields[index] = { ...updatedFields[index], ...updates };
-    setFields(updatedFields);
-  };
-
-  const removeField = (index: number) => {
-    Alert.alert("Eliminar cancha", "¿Estás seguro de eliminar esta cancha?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: () => {
-          setFields(fields.filter((_, i) => i !== index));
-        },
-      },
-    ]);
-  };
-
-  const toggleService = (serviceKey: string) => {
-    setServices(prev => ({
-      ...prev,
-      [serviceKey]: !prev[serviceKey]
-    }));
-  };
-
-  // Step Indicator mejorado para 4 pasos
   const StepIndicator = () => (
     <View style={styles.stepIndicatorContainer}>
-      {[1, 2, 3, 4].map((step) => (
+      {[1, 2].map((step) => (
         <View key={step} style={styles.stepIndicatorRow}>
           <View
             style={[
@@ -307,7 +390,7 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
               </Text>
             )}
           </View>
-          {step < 4 && (
+          {step < 2 && (
             <View
               style={[
                 styles.stepLine,
@@ -323,68 +406,386 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>📍 Información del negocio</Text>
+        <Text style={styles.stepTitle}>🏢 Información del Negocio</Text>
         <Text style={styles.stepSubtitle}>
-          Cuéntanos sobre tu negocio para que los jugadores te encuentren
+          Datos básicos del establecimiento y administrador
         </Text>
       </View>
 
       <View style={styles.formContainer}>
-        <Controller
-          control={control}
-          name="businessName"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <CustomInput
-              label="Nombre del negocio"
-              placeholder="Ej: Cancha El Estadio"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.businessName?.message}
-              leftIcon="business-outline"
-              required
-            />
-          )}
-        />
+        {/* Información del negocio */}
+        <View style={styles.businessSection}>
+          <Text style={styles.sectionTitle}>🏢 Datos del Establecimiento</Text>
 
-        <Controller
-          control={control}
-          name="address"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <CustomInput
-              label="Dirección completa"
-              placeholder="Calle 72 #15-30, Barranquilla"
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.address?.message}
-              leftIcon="location-outline"
-              multiline
-              required
-            />
-          )}
-        />
+          <Controller
+            control={control}
+            name="businessName"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Nombre del negocio"
+                placeholder="Ej: Canchas El Estadio"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.businessName?.message}
+                leftIcon="business-outline"
+                required
+              />
+            )}
+          />
 
-        <Controller
-          control={control}
-          name="description"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <CustomInput
-              label="Descripción"
-              placeholder="Describe tu negocio, servicios, instalaciones..."
-              value={value}
-              onChangeText={onChange}
-              onBlur={onBlur}
-              error={errors.description?.message}
-              leftIcon="document-text-outline"
-              multiline
-              style={{ height: 100 }}
-              required
-            />
-          )}
-        />
+          <Controller
+            control={control}
+            name="address"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Dirección completa"
+                placeholder="Calle 72 #15-30, Villavicencio"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.address?.message}
+                leftIcon="location-outline"
+                multiline
+                required
+              />
+            )}
+          />
 
-        {/* Ubicación con mapa */}
+          <Controller
+            control={control}
+            name="description"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Descripción del negocio"
+                placeholder="Describe tu negocio, servicios, instalaciones..."
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.description?.message}
+                leftIcon="document-text-outline"
+                multiline
+                style={{ height: 100 }}
+                required
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="nit"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="NIT del establecimiento"
+                placeholder="900123456-1"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.nit?.message}
+                leftIcon="business-outline"
+                required
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="razonSocial"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Razón social"
+                placeholder="Ej: CANCHAS EL ESTADIO S.A.S"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.razonSocial?.message}
+                leftIcon="business-outline"
+                required
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="businessEmail"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Email empresarial (opcional)"
+                placeholder="empresa@canchas.com (se usará el del admin si está vacío)"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                leftIcon="mail-outline"
+                keyboardType="email-address"
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="billingEmail"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Email para facturación (opcional)"
+                placeholder="facturacion@canchas.com (se usará el del admin si está vacío)"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                leftIcon="receipt-outline"
+                keyboardType="email-address"
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="businessPhone"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Teléfono del establecimiento (opcional)"
+                placeholder="3007654321 (se usará el del admin si está vacío)"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                keyboardType="phone-pad"
+                leftIcon="call-outline"
+              />
+            )}
+          />
+          <View style={styles.horariosSection}>
+            <Text style={styles.fieldLabel}>🕐 Horarios de Atención</Text>
+            <View style={styles.timeRow}>
+              <Controller
+                control={control}
+                name="openTime"
+                render={({ field: { onChange, value } }) => (
+                  <View style={styles.timeInput}>
+                    <Text style={styles.timeLabel}>Apertura</Text>
+                    <CustomInput
+                      placeholder="06:00"
+                      value={value}
+                      onChangeText={onChange}
+                      containerStyle={styles.timeField}
+                    />
+                  </View>
+                )}
+              />
+              <Controller
+                control={control}
+                name="closeTime"
+                render={({ field: { onChange, value } }) => (
+                  <View style={styles.timeInput}>
+                    <Text style={styles.timeLabel}>Cierre</Text>
+                    <CustomInput
+                      placeholder="23:00"
+                      value={value}
+                      onChangeText={onChange}
+                      containerStyle={styles.timeField}
+                    />
+                  </View>
+                )}
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.adminSection}>
+          <Text style={styles.sectionTitle}>👤 Datos del Administrador</Text>
+
+          <View style={styles.photoSection}>
+            <Text style={styles.fieldLabel}>📸 Foto de perfil</Text>
+            <TouchableOpacity
+              style={styles.photoContainer}
+              onPress={pickProfileImage}
+            >
+              {profileImage ? (
+                <Image
+                  source={{ uri: profileImage }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons
+                    name="camera-outline"
+                    size={32}
+                    color={Colors.textMuted}
+                  />
+                  <Text style={styles.photoPlaceholderText}>Agregar foto</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <Controller
+            control={control}
+            name="adminName"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Nombre completo del administrador"
+                placeholder="Juan Pérez García"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.adminName?.message}
+                leftIcon="person-outline"
+                required
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="adminDocumentNumber"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Número de documento"
+                placeholder="1234567890"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.adminDocumentNumber?.message}
+                keyboardType="numeric"
+                leftIcon="card-outline"
+                required
+              />
+            )}
+          />
+
+          <View style={styles.genderSection}>
+            <Text style={styles.fieldLabel}>🚹🚺 Género</Text>
+            <View style={styles.genderContainer}>
+              {genders.map((gender) => (
+                <TouchableOpacity
+                  key={gender.value}
+                  style={[
+                    styles.genderCard,
+                    watch("adminGender") === gender.value &&
+                      styles.genderCardSelected,
+                  ]}
+                  onPress={() => setValue("adminGender", gender.value)}
+                >
+                  <Text style={styles.genderEmoji}>{gender.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.genderLabel,
+                      watch("adminGender") === gender.value &&
+                        styles.genderLabelSelected,
+                    ]}
+                  >
+                    {gender.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.dateSection}>
+            <Text style={styles.fieldLabel}>📅 Fecha de nacimiento</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={20}
+                color={Colors.primary}
+              />
+              <Text style={styles.dateButtonText}>
+                {watchedBirthDate
+                  ? watchedBirthDate.toLocaleDateString()
+                  : "Seleccionar fecha"}
+              </Text>
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={watchedBirthDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) {
+                    setValue("adminBirthDate", selectedDate);
+                  }
+                }}
+                maximumDate={new Date()}
+              />
+            )}
+          </View>
+
+          <Controller
+            control={control}
+            name="adminEmail"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Email del administrador"
+                placeholder="admin@tucanchas.com"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.adminEmail?.message}
+                leftIcon="mail-outline"
+                keyboardType="email-address"
+                required
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="adminPassword"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Contraseña"
+                placeholder="••••••••"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.adminPassword?.message}
+                secureTextEntry
+                leftIcon="lock-closed-outline"
+                required
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="adminConfirmPassword"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Confirmar contraseña"
+                placeholder="••••••••"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.adminConfirmPassword?.message}
+                secureTextEntry
+                leftIcon="lock-closed-outline"
+                required
+              />
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="adminPhone"
+            render={({ field: { onChange, onBlur, value } }) => (
+              <CustomInput
+                label="Teléfono del administrador"
+                placeholder="3001234567"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                error={errors.adminPhone?.message}
+                keyboardType="phone-pad"
+                leftIcon="call-outline"
+                required
+              />
+            )}
+          />
+        </View>
+
         <View style={styles.locationSection}>
           <Text style={styles.sectionTitle}>📍 Ubicación</Text>
 
@@ -435,409 +836,189 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
   const renderStep2 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>📸 Fotos del negocio</Text>
+        <Text style={styles.stepTitle}>📄 Documentos y Fotos</Text>
         <Text style={styles.stepSubtitle}>
-          Sube fotos atractivas de tus canchas e instalaciones
-        </Text>
-      </View>
-
-      <View style={styles.imagesSection}>
-        <TouchableOpacity
-          style={styles.imagePickerButton}
-          onPress={pickImages}
-          disabled={businessImages.length >= 6}
-        >
-          <View style={styles.imagePickerContent}>
-            <Ionicons
-              name="camera-outline"
-              size={32}
-              color={
-                businessImages.length >= 6 ? Colors.textMuted : Colors.primary
-              }
-            />
-            <Text
-              style={[
-                styles.imagePickerText,
-                businessImages.length >= 6 && styles.imagePickerTextDisabled,
-              ]}
-            >
-              {businessImages.length === 0
-                ? "Agregar fotos"
-                : businessImages.length >= 6
-                ? "Máximo alcanzado"
-                : "Agregar más fotos"}
-            </Text>
-            <Text style={styles.imagePickerSubtext}>
-              {businessImages.length}/6 fotos
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {businessImages.length > 0 && (
-          <View style={styles.imagesGrid}>
-            {businessImages.map((uri, index) => (
-              <View key={index} style={styles.imageContainer}>
-                <Image source={{ uri }} style={styles.image} />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={() =>
-                    setBusinessImages(
-                      businessImages.filter((_, i) => i !== index)
-                    )
-                  }
-                >
-                  <Ionicons name="close" size={14} color={Colors.background} />
-                </TouchableOpacity>
-                <View style={styles.imageNumber}>
-                  <Text style={styles.imageNumberText}>{index + 1}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {businessImages.length === 0 && (
-          <View style={styles.imagesPlaceholder}>
-            <Ionicons
-              name="images-outline"
-              size={48}
-              color={Colors.textMuted}
-            />
-            <Text style={styles.placeholderText}>
-              Las fotos ayudan a los jugadores a conocer tu negocio
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-
-  // Step 3 mejorado - Canchas con diseño más wow
-  const renderStep3 = () => (
-    <View style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>⚽ Configurar Canchas</Text>
-        <Text style={styles.stepSubtitle}>
-          Agrega y personaliza tus canchas disponibles
-        </Text>
-      </View>
-
-      <View style={styles.fieldsSection}>
-        {fields.map((field, index) => (
-          <View key={field.id} style={styles.fieldCardImproved}>
-            {/* Header con gradiente */}
-            <View style={[
-              styles.fieldHeaderImproved,
-              { backgroundColor: fieldTypes.find(ft => ft.value === field.type)?.color || Colors.primary }
-            ]}>
-              <View style={styles.fieldTitleRow}>
-                <View style={styles.fieldIconContainer}>
-                  <Text style={styles.fieldEmojiLarge}>
-                    {fieldTypes.find((ft) => ft.value === field.type)?.emoji || "⚽"}
-                  </Text>
-                </View>
-                <View style={styles.fieldTitleContent}>
-                  <Text style={styles.fieldTitleWhite}>
-                    {field.name || `Cancha ${index + 1}`}
-                  </Text>
-                  <Text style={styles.fieldSubtitleWhite}>
-                    {fieldTypes.find((ft) => ft.value === field.type)?.label} • {fieldTypes.find((ft) => ft.value === field.type)?.capacity} jugadores
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.removeFieldButtonImproved}
-                onPress={() => removeField(index)}
-              >
-                <Ionicons name="trash-outline" size={20} color="white" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.fieldBodyImproved}>
-              <CustomInput
-                label="Nombre de la cancha"
-                placeholder="Ej: Cancha Principal"
-                value={field.name}
-                onChangeText={(text) => updateField(index, { name: text })}
-                containerStyle={styles.fieldInputImproved}
-              />
-
-              {/* Tipo de cancha con cards mejoradas */}
-              <View style={styles.fieldTypeSection}>
-                <Text style={styles.fieldLabelImproved}>🏟️ Tipo de cancha</Text>
-                <View style={styles.fieldTypesImproved}>
-                  {fieldTypes.map((type) => (
-                    <TouchableOpacity
-                      key={type.value}
-                      style={[
-                        styles.fieldTypeCardImproved,
-                        field.type === type.value && [
-                          styles.fieldTypeCardSelectedImproved,
-                          { borderColor: type.color, backgroundColor: type.color + '15' },
-                        ],
-                      ]}
-                      onPress={() => updateField(index, { type: type.value })}
-                    >
-                      <View style={[styles.fieldTypeHeader, { backgroundColor: type.color }]}>
-                        <Text style={styles.fieldTypeEmojiImproved}>{type.emoji}</Text>
-                      </View>
-                      <View style={styles.fieldTypeContent}>
-                        <Text style={[
-                          styles.fieldTypeLabelImproved,
-                          field.type === type.value && { color: type.color, fontWeight: 'bold' },
-                        ]}>
-                          {type.label}
-                        </Text>
-                        <Text style={styles.fieldTypeCapacityImproved}>
-                          {type.capacity} jugadores
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <CustomInput
-                label="💰 Precio por hora (COP)"
-                placeholder="50000"
-                value={field.pricePerHour?.toString()}
-                onChangeText={(text) =>
-                  updateField(index, { pricePerHour: parseInt(text) || 0 })
-                }
-                keyboardType="numeric"
-                leftIcon="cash-outline"
-                containerStyle={styles.fieldInputImproved}
-              />
-
-              {/* Características mejoradas */}
-              <View style={styles.fieldFeaturesImproved}>
-                <Text style={styles.fieldLabelImproved}>✨ Características especiales</Text>
-                <View style={styles.featuresGrid}>
-                  <TouchableOpacity
-                    style={[
-                      styles.featureCardImproved,
-                      field.hasLighting && styles.featureCardActiveImproved,
-                    ]}
-                    onPress={() =>
-                      updateField(index, { hasLighting: !field.hasLighting })
-                    }
-                  >
-                    <View style={[styles.featureIconContainer, field.hasLighting && { backgroundColor: Colors.primary }]}>
-                      <Ionicons
-                        name={field.hasLighting ? "bulb" : "bulb-outline"}
-                        size={24}
-                        color={field.hasLighting ? "white" : Colors.textMuted}
-                      />
-                    </View>
-                    <Text style={[
-                      styles.featureTextImproved,
-                      field.hasLighting && styles.featureTextActiveImproved,
-                    ]}>
-                      Iluminación
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.featureCardImproved,
-                      field.isIndoor && styles.featureCardActiveImproved,
-                    ]}
-                    onPress={() =>
-                      updateField(index, { isIndoor: !field.isIndoor })
-                    }
-                  >
-                    <View style={[styles.featureIconContainer, field.isIndoor && { backgroundColor: Colors.primary }]}>
-                      <Ionicons
-                        name={field.isIndoor ? "home" : "home-outline"}
-                        size={24}
-                        color={field.isIndoor ? "white" : Colors.textMuted}
-                      />
-                    </View>
-                    <Text style={[
-                      styles.featureTextImproved,
-                      field.isIndoor && styles.featureTextActiveImproved,
-                    ]}>
-                      Techada
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-        ))}
-
-        {/* Botón mejorado para agregar cancha */}
-        <TouchableOpacity style={styles.addFieldButtonImproved} onPress={addField}>
-          <View style={styles.addFieldContent}>
-            <View style={styles.addFieldIconContainer}>
-              <Ionicons name="add" size={24} color="white" />
-            </View>
-            <Text style={styles.addFieldTextImproved}>Agregar nueva cancha</Text>
-            <Text style={styles.addFieldSubtext}>Configura todas tus instalaciones</Text>
-          </View>
-        </TouchableOpacity>
-
-        {fields.length === 0 && (
-          <View style={styles.fieldsPlaceholderImproved}>
-            <View style={styles.placeholderIconContainer}>
-              <Ionicons name="football-outline" size={64} color={Colors.primary} />
-            </View>
-            <Text style={styles.placeholderTitleImproved}>¡Agrega tus canchas!</Text>
-            <Text style={styles.placeholderTextImproved}>
-              Configura todas las canchas disponibles en tu establecimiento
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-
-  // Nuevo Step 4 - Información del administrador
-  const renderStep4 = () => (
-    <View style={styles.stepContainer}>
-      <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>👤 Información del Administrador</Text>
-        <Text style={styles.stepSubtitle}>
-          Datos del responsable y servicios del establecimiento
+          Sube los documentos requeridos y fotos de tu establecimiento
         </Text>
       </View>
 
       <View style={styles.formContainer}>
-        {/* Información del admin */}
-        <View style={styles.adminSection}>
-          <Text style={styles.sectionTitle}>📋 Datos del Responsable</Text>
-          
-          <Controller
-            control={control}
-            name="adminName"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <CustomInput
-                label="Nombre completo del administrador"
-                placeholder="Juan Pérez García"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.adminName?.message}
-                leftIcon="person-outline"
-                required
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="adminEmail"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <CustomInput
-                label="Email del administrador"
-                placeholder="admin@tucanchas.com"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.adminEmail?.message}
-                leftIcon="mail-outline"
-                keyboardType="email-address"
-                required
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="nit"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <CustomInput
-                label="NIT del establecimiento"
-                placeholder="900123456-1"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={errors.nit?.message}
-                leftIcon="business-outline"
-                required
-              />
-            )}
-          />
-        </View>
-
-        {/* Documentos */}
         <View style={styles.documentsSection}>
           <Text style={styles.sectionTitle}>📄 Documentos Requeridos</Text>
-          
+
           <View style={styles.documentCard}>
             <View style={styles.documentHeader}>
-              <Ionicons name="document-text-outline" size={24} color={Colors.primary} />
-              <Text style={styles.documentLabel}>Certificación Bancaria</Text>
+              <Ionicons
+                name="document-text-outline"
+                size={24}
+                color={Colors.primary}
+              />
+              <Text style={styles.documentLabel}>RUT</Text>
             </View>
             <CustomButton
-              title={documents.bankCertification ? "✓ Documento cargado" : "Cargar documento"}
-              variant={documents.bankCertification ? "outline" : "primary"}
-              onPress={() => pickDocument('bankCertification')}
-              icon={documents.bankCertification ? "checkmark-circle-outline" : "cloud-upload-outline"}
+              title={documents.rut ? "✓ Documento cargado" : "Cargar RUT"}
+              variant={documents.rut ? "outline" : "primary"}
+              onPress={() => pickDocument("rut")}
+              icon={
+                documents.rut
+                  ? "checkmark-circle-outline"
+                  : "cloud-upload-outline"
+              }
+            />
+          </View>
+
+          <View style={styles.documentCard}>
+            <View style={styles.documentHeader}>
+              <Ionicons
+                name="business-outline"
+                size={24}
+                color={Colors.primary}
+              />
+              <Text style={styles.documentLabel}>Cámara de Comercio</Text>
+            </View>
+            <CustomButton
+              title={
+                documents.camaraComercio
+                  ? "✓ Documento cargado"
+                  : "Cargar documento"
+              }
+              variant={documents.camaraComercio ? "outline" : "primary"}
+              onPress={() => pickDocument("camaraComercio")}
+              icon={
+                documents.camaraComercio
+                  ? "checkmark-circle-outline"
+                  : "cloud-upload-outline"
+              }
             />
           </View>
 
           <View style={styles.documentCard}>
             <View style={styles.documentHeader}>
               <Ionicons name="card-outline" size={24} color={Colors.primary} />
-              <Text style={styles.documentLabel}>Cédula del Representante</Text>
+              <Text style={styles.documentLabel}>Certificación Bancaria</Text>
             </View>
             <CustomButton
-              title={documents.representativeId ? "✓ Documento cargado" : "Cargar documento"}
-              variant={documents.representativeId ? "outline" : "primary"}
-              onPress={() => pickDocument('representativeId')}
-              icon={documents.representativeId ? "checkmark-circle-outline" : "cloud-upload-outline"}
+              title={
+                documents.certificacionBancaria
+                  ? "✓ Documento cargado"
+                  : "Cargar documento"
+              }
+              variant={documents.certificacionBancaria ? "outline" : "primary"}
+              onPress={() => pickDocument("certificacionBancaria")}
+              icon={
+                documents.certificacionBancaria
+                  ? "checkmark-circle-outline"
+                  : "cloud-upload-outline"
+              }
+            />
+          </View>
+
+          <View style={styles.documentCard}>
+            <View style={styles.documentHeader}>
+              <Ionicons
+                name="person-outline"
+                size={24}
+                color={Colors.primary}
+              />
+              <Text style={styles.documentLabel}>
+                Cédula del Representante Legal
+              </Text>
+            </View>
+            <CustomButton
+              title={
+                documents.cedulaRepresentanteLegal
+                  ? "✓ Documento cargado"
+                  : "Cargar documento"
+              }
+              variant={
+                documents.cedulaRepresentanteLegal ? "outline" : "primary"
+              }
+              onPress={() => pickDocument("cedulaRepresentanteLegal")}
+              icon={
+                documents.cedulaRepresentanteLegal
+                  ? "checkmark-circle-outline"
+                  : "cloud-upload-outline"
+              }
             />
           </View>
         </View>
 
-        {/* Servicios del establecimiento */}
-        <View style={styles.servicesSection}>
-          <Text style={styles.sectionTitle}>🏢 Servicios del Establecimiento</Text>
-          <Text style={styles.servicesSubtitle}>
-            Selecciona los servicios disponibles en tu establecimiento
+        <View style={styles.imagesSection}>
+          <Text style={styles.sectionTitle}>📸 Fotos del Establecimiento</Text>
+          <Text style={styles.imagesSubtitle}>
+            Sube fotos atractivas de tus canchas e instalaciones (máximo 6)
           </Text>
 
-          <View style={styles.servicesGrid}>
-            {facilityServices.map((service) => (
-              <TouchableOpacity
-                key={service.key}
+          <TouchableOpacity
+            style={styles.imagePickerButton}
+            onPress={pickImages}
+            disabled={businessImages.length >= 6}
+          >
+            <View style={styles.imagePickerContent}>
+              <Ionicons
+                name="camera-outline"
+                size={32}
+                color={
+                  businessImages.length >= 6 ? Colors.textMuted : Colors.primary
+                }
+              />
+              <Text
                 style={[
-                  styles.serviceCard,
-                  services[service.key] && styles.serviceCardActive,
+                  styles.imagePickerText,
+                  businessImages.length >= 6 && styles.imagePickerTextDisabled,
                 ]}
-                onPress={() => toggleService(service.key)}
               >
-                <View style={[
-                  styles.serviceIconContainer,
-                  services[service.key] && styles.serviceIconActive
-                ]}>
-                  <Ionicons
-                    name={service.icon as any}
-                    size={20}
-                    color={services[service.key] ? "white" : Colors.textMuted}
-                  />
+                {businessImages.length === 0
+                  ? "Agregar fotos"
+                  : businessImages.length >= 6
+                  ? "Máximo alcanzado"
+                  : "Agregar más fotos"}
+              </Text>
+              <Text style={styles.imagePickerSubtext}>
+                {businessImages.length}/6 fotos
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {businessImages.length > 0 && (
+            <View style={styles.imagesGrid}>
+              {businessImages.map((uri, index) => (
+                <View key={index} style={styles.imageContainer}>
+                  <Image source={{ uri }} style={styles.image} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() =>
+                      setBusinessImages(
+                        businessImages.filter((_, i) => i !== index)
+                      )
+                    }
+                  >
+                    <Ionicons
+                      name="close"
+                      size={14}
+                      color={Colors.background}
+                    />
+                  </TouchableOpacity>
+                  <View style={styles.imageNumber}>
+                    <Text style={styles.imageNumberText}>{index + 1}</Text>
+                  </View>
                 </View>
-                <Text style={[
-                  styles.serviceText,
-                  services[service.key] && styles.serviceTextActive,
-                ]}>
-                  {service.label}
-                </Text>
-                <View style={[
-                  styles.serviceToggle,
-                  services[service.key] && styles.serviceToggleActive,
-                ]}>
-                  <Text style={[
-                    styles.serviceToggleText,
-                    services[service.key] && styles.serviceToggleTextActive,
-                  ]}>
-                    {services[service.key] ? "SÍ" : "NO"}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
+
+          {businessImages.length === 0 && (
+            <View style={styles.imagesPlaceholder}>
+              <Ionicons
+                name="images-outline"
+                size={48}
+                color={Colors.textMuted}
+              />
+              <Text style={styles.placeholderText}>
+                Las fotos ayudan a los jugadores a conocer tu negocio
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </View>
@@ -846,63 +1027,85 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
   const canContinue = () => {
     switch (currentStep) {
       case 1:
-        return location !== null;
+        return location !== null && watch("adminBirthDate") !== undefined;
       case 2:
-        return true; // Las fotos son opcionales
-      case 3:
-        return fields.length > 0 && fields.every((field) => field.name.trim());
-      case 4:
-        return documents.bankCertification && documents.representativeId;
+        return Object.values(documents).every((doc) => doc !== null);
       default:
         return false;
     }
   };
 
-  const onSubmit = async (data: HostRegistrationForm) => {
+  const onSubmit = async (data: ExtendedHostRegistrationForm) => {
     try {
       setIsLoading(true);
 
-      const hostData: Partial<Host> = {
-        ...data,
-        userType: "host",
-        coordinates: location,
-        documents,
-        services,
-        fields: fields.map((field) => ({
-          ...field,
-          capacity:
-            fieldTypes.find((ft) => ft.value === field.type)?.capacity || 10,
-          images: businessImages,
-          isActive: true,
-        })),
-        rating: 0,
-        totalReviews: 0,
-        businessHours: {
-          monday: { open: "06:00", close: "23:00", isOpen: true },
-          tuesday: { open: "06:00", close: "23:00", isOpen: true },
-          wednesday: { open: "06:00", close: "23:00", isOpen: true },
-          thursday: { open: "06:00", close: "23:00", isOpen: true },
-          friday: { open: "06:00", close: "23:00", isOpen: true },
-          saturday: { open: "06:00", close: "23:00", isOpen: true },
-          sunday: { open: "08:00", close: "22:00", isOpen: true },
-        },
-      };
+      console.log("🚀 HOST Enviando datos del anfitrión:", data.businessName);
+      console.log("🔍 HOST Datos del formulario COMPLETOS:", {
+        businessName: data.businessName,
+        address: data.address,
+        nit: data.nit,
+        razonSocial: data.razonSocial,
+        adminName: data.adminName,
+        adminEmail: data.adminEmail,
+        adminPhone: data.adminPhone,
+        businessEmail: data.businessEmail,
+        billingEmail: data.billingEmail,
+        businessPhone: data.businessPhone,
+        openTime: data.openTime,
+        closeTime: data.closeTime,
+      });
 
-      await updateUser(hostData);
+      if (!data.razonSocial?.trim()) {
+        Alert.alert("Error", "La razón social es requerida");
+        return;
+      }
+      if (!location) {
+        Alert.alert("Error", "Debes obtener la ubicación del negocio");
+        return;
+      }
 
-      Alert.alert(
-        "¡Bienvenido a TUNG! 🎉",
-        "Tu negocio ha sido registrado exitosamente. ¡Ya puedes empezar a crear eventos!",
-        [
-          {
-            text: "Comenzar",
-            onPress: () => {
-              // La navegación se manejará automáticamente por el AuthContext
-            },
+      const result = await hostService.createHostWithValidation(
+        data,
+        location,
+        {
+          profileImage: profileImage || undefined,
+          documents: {
+            rut: documents.rut?.uri,
+            camaraComercio: documents.camaraComercio?.uri,
+            certificacionBancaria: documents.certificacionBancaria?.uri,
+            cedulaRepresentanteLegal: documents.cedulaRepresentanteLegal?.uri,
           },
-        ]
+          businessImages: businessImages,
+        }
       );
+
+      if (result.success) {
+        console.log("🎉 Registro exitoso, mostrando modal de verificación");
+
+        setUserEmail(data.adminEmail);
+
+        setShowVerificationModal(true);
+
+        Alert.alert(
+          "¡Registro exitoso! 📧",
+          `Hemos enviado un código de verificación a ${data.adminEmail}. Revisa tu bandeja de entrada.`,
+          [{ text: "OK" }]
+        );
+      } else {
+        console.error(
+          "❌ Error en el servicio:",
+          result.message,
+          result.errors
+        );
+        Alert.alert(
+          "Error al crear cuenta",
+          result.message +
+            (result.errors ? `\n\nDetalles:\n${result.errors.join("\n")}` : ""),
+          [{ text: "OK" }]
+        );
+      }
     } catch (error) {
+      console.error("❌ Error en registro de anfitrión:", error);
       Alert.alert(
         "Error",
         "Hubo un problema al registrar tu negocio. Intenta nuevamente.",
@@ -921,7 +1124,6 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -938,17 +1140,14 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
 
           <View style={styles.headerContent}>
-            <Text style={styles.title}>Registro de Negocio</Text>
+            <Text style={styles.title}>Registro de Anfitrión</Text>
             <Text style={styles.subtitle}>
               {currentStep === 1 && "Información básica"}
-              {currentStep === 2 && "Fotos del negocio"}
-              {currentStep === 3 && "Configurar canchas"}
-              {currentStep === 4 && "Datos del administrador"}
+              {currentStep === 2 && "Documentos y fotos"}
             </Text>
           </View>
         </View>
 
-        {/* Step Indicator */}
         <StepIndicator />
 
         <ScrollView
@@ -958,14 +1157,11 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
         >
           {currentStep === 1 && renderStep1()}
           {currentStep === 2 && renderStep2()}
-          {currentStep === 3 && renderStep3()}
-          {currentStep === 4 && renderStep4()}
         </ScrollView>
 
-        {/* Footer */}
         <View style={styles.footer}>
           <View style={styles.footerButtons}>
-            {currentStep < 4 ? (
+            {currentStep < 2 ? (
               <CustomButton
                 title="Continuar"
                 onPress={() => setCurrentStep(currentStep + 1)}
@@ -983,6 +1179,8 @@ const HostRegistrationScreen: React.FC<Props> = ({ navigation }) => {
             )}
           </View>
         </View>
+
+        <VerificationModal />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1028,7 +1226,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
 
-  // Step Indicator actualizado para 4 pasos
   stepIndicatorContainer: {
     flexDirection: "row",
     justifyContent: "center",
@@ -1068,10 +1265,10 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   stepLine: {
-    width: 30,
+    width: 50,
     height: 2,
     backgroundColor: Colors.border,
-    marginHorizontal: 6,
+    marginHorizontal: 8,
   },
   stepLineActive: {
     backgroundColor: Colors.primary,
@@ -1102,19 +1299,154 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   formContainer: {
+    gap: 24,
+  },
+
+  // Secciones
+  businessSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
+  },
+  adminSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
+  },
+  locationSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
+  },
+  documentsSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
+  },
+  imagesSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
     gap: 16,
   },
 
-  // Ubicación con mapa (mantener estilo original)
-  locationSection: {
-    marginTop: 8,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: Colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: 8,
   },
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+
+  photoSection: {
+    alignItems: "center",
+    marginVertical: 16,
+  },
+  photoContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: Colors.background,
+    borderWidth: 3,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+  },
+  photoPlaceholder: {
+    alignItems: "center",
+    gap: 4,
+  },
+  photoPlaceholderText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+
+  genderSection: {
+    marginVertical: 8,
+  },
+  genderContainer: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  genderCard: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: Colors.border,
+  },
+  genderCardSelected: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  genderEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  genderLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
+  genderLabelSelected: {
+    color: Colors.primary,
+  },
+
+  dateSection: {
+    marginVertical: 8,
+  },
+  dateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 12,
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+  },
+
+  horariosSection: {
+    marginVertical: 8,
+  },
+  timeRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  timeInput: {
+    flex: 1,
+  },
+  timeLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  timeField: {
+    flex: 1,
+  },
+
   mapContainer: {
     marginTop: 16,
     borderRadius: 12,
@@ -1144,9 +1476,29 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
   },
 
-  // Imágenes (mantener estilo original)
-  imagesSection: {
-    gap: 16,
+  documentCard: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  documentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  documentLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
+
+  imagesSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 12,
   },
   imagePickerButton: {
     borderWidth: 2,
@@ -1179,8 +1531,8 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     position: "relative",
-    width: (width - 64) / 3,
-    height: (width - 64) / 3,
+    width: (width - 84) / 3,
+    height: (width - 84) / 3,
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -1226,315 +1578,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Estilos mejorados para CANCHAS
-  fieldsSection: {
-    gap: 20,
-  },
-  fieldCardImproved: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    overflow: "hidden",
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  fieldHeaderImproved: {
-    padding: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  fieldTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  fieldIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-  },
-  fieldEmojiLarge: {
-    fontSize: 24,
-  },
-  fieldTitleContent: {
-    flex: 1,
-  },
-  fieldTitleWhite: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "white",
-    marginBottom: 4,
-  },
-  fieldSubtitleWhite: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
-  },
-  removeFieldButtonImproved: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  fieldBodyImproved: {
-    padding: 20,
-    backgroundColor: Colors.background,
-  },
-  fieldInputImproved: {
-    marginBottom: 16,
-  },
-  fieldLabelImproved: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: 12,
-  },
-  fieldTypesImproved: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 20,
-  },
-  fieldTypeCardImproved: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: Colors.border,
-  },
-  fieldTypeCardSelectedImproved: {
-    borderWidth: 2,
-  },
-  fieldTypeHeader: {
-    padding: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fieldTypeEmojiImproved: {
-    fontSize: 20,
-    color: "white",
-  },
-  fieldTypeContent: {
-    padding: 12,
-    alignItems: "center",
-    backgroundColor: Colors.background,
-  },
-  fieldTypeLabelImproved: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  fieldTypeCapacityImproved: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  fieldFeaturesImproved: {
-    marginTop: 8,
-  },
-  featuresGrid: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  featureCardImproved: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  featureCardActiveImproved: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
-  },
-  featureIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.border,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  featureTextImproved: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    textAlign: "center",
-    fontWeight: "500",
-  },
-  featureTextActiveImproved: {
-    color: Colors.primary,
-    fontWeight: "600",
-  },
-  addFieldButtonImproved: {
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    padding: 20,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  addFieldContent: {
-    alignItems: "center",
-  },
-  addFieldIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  addFieldTextImproved: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "white",
-    marginBottom: 4,
-  },
-  addFieldSubtext: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
-  },
-  fieldsPlaceholderImproved: {
-    alignItems: "center",
-    paddingVertical: 40,
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderStyle: "dashed",
-  },
-  placeholderIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  placeholderTitleImproved: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: Colors.textPrimary,
-    marginBottom: 8,
-  },
-  placeholderTextImproved: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    paddingHorizontal: 20,
-  },
-
-  // Estilos para Step 4 - Administrador
-  adminSection: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    gap: 16,
-  },
-  documentsSection: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    gap: 16,
-  },
-  documentCard: {
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-  },
-  documentHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  documentLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-  },
-  servicesSection: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    gap: 16,
-  },
-  servicesSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  servicesGrid: {
-    gap: 12,
-  },
-  serviceCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  serviceCardActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
-  },
-  serviceIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.border,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  serviceIconActive: {
-    backgroundColor: Colors.primary,
-  },
-  serviceText: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.textPrimary,
-    fontWeight: "500",
-  },
-  serviceTextActive: {
-    color: Colors.primary,
-    fontWeight: "600",
-  },
-  serviceToggle: {
-    backgroundColor: Colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  serviceToggleActive: {
-    backgroundColor: Colors.primary,
-  },
-  serviceToggleText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: Colors.textMuted,
-  },
-  serviceToggleTextActive: {
-    color: "white",
-  },
-
   footer: {
     position: "absolute",
     bottom: 0,
@@ -1549,6 +1592,102 @@ const styles = StyleSheet.create({
   footerButtons: {
     flexDirection: "row",
     gap: 12,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    backgroundColor: Colors.background,
+    borderRadius: 20,
+    margin: 20,
+    width: width * 0.9,
+    maxWidth: 400,
+  },
+  modalHeader: {
+    alignItems: "center",
+    padding: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: Colors.textPrimary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  modalEmail: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.primary,
+  },
+  modalContent: {
+    padding: 24,
+  },
+  verificationLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  verificationInput: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    textAlign: "center",
+    letterSpacing: 4,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+  },
+  modalSecondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textSecondary,
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+  },
+  modalButtonDisabled: {
+    backgroundColor: Colors.textMuted,
+  },
+  modalPrimaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "white",
+  },
+  modalHint: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: "center",
+    lineHeight: 20,
   },
 });
 

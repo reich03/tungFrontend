@@ -9,17 +9,23 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
-  Animated,
+  RefreshControl,
 } from "react-native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RouteProp } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { HomeStackParamList, Event, PlayerPosition, Player, FieldType } from "../../types";
+import { HomeStackParamList } from "../../types";
 import { Colors, Gradients } from "../../constants/Colors";
 import { useAuth } from "../../context/AuthContext";
 import CustomButton from "../../components/common/CustomButton";
+import playerEventService from "../../services/playerEventService";
+import {
+  EventForFrontend,
+  EventPosition,
+  getPositionType,
+} from "../../types/eventTypes";
 
 const { width } = Dimensions.get("window");
 
@@ -34,160 +40,57 @@ interface Props {
   route: JoinEventScreenRouteProp;
 }
 
-// Tipos para posiciones en la cancha
-interface FieldPosition {
-  id: string;
-  x: number; // Posición X en porcentaje (0-100)
-  y: number; // Posición Y en porcentaje (0-100)
-  role: PlayerPosition;
-  isOccupied: boolean;
-  player?: {
-    id: string;
-    name: string;
-    avatar?: string;
-  };
-}
-
-// Configuración de canchas
-const getFieldLayout = (fieldType: FieldType): FieldPosition[] => {
-  switch (fieldType) {
-    case "futbol5":
-      return [
-        // Arquero
-        { id: "gk1", x: 50, y: 10, role: "goalkeeper", isOccupied: false },
-        // Defensas
-        { id: "def1", x: 25, y: 30, role: "defender", isOccupied: false },
-        { id: "def2", x: 75, y: 30, role: "defender", isOccupied: false },
-        // Mediocampos
-        { id: "mid1", x: 35, y: 55, role: "midfielder", isOccupied: true, player: { id: "1", name: "Juan P." } },
-        { id: "mid2", x: 65, y: 55, role: "midfielder", isOccupied: true, player: { id: "2", name: "Carlos M." } },
-        // Delanteros
-        { id: "fwd1", x: 50, y: 80, role: "forward", isOccupied: true, player: { id: "3", name: "Luis R." } },
-        // Posiciones adicionales para suplentes/rotación
-        { id: "sub1", x: 20, y: 70, role: "midfielder", isOccupied: false },
-        { id: "sub2", x: 80, y: 70, role: "defender", isOccupied: false },
-        { id: "sub3", x: 50, y: 45, role: "forward", isOccupied: true, player: { id: "4", name: "Pedro L." } },
-        { id: "sub4", x: 15, y: 50, role: "midfielder", isOccupied: false },
-      ];
-    
-    case "futbol7":
-      return [
-        // Arquero
-        { id: "gk1", x: 50, y: 8, role: "goalkeeper", isOccupied: true, player: { id: "1", name: "Miguel A." } },
-        // Defensas
-        { id: "def1", x: 20, y: 25, role: "defender", isOccupied: false },
-        { id: "def2", x: 50, y: 25, role: "defender", isOccupied: true, player: { id: "2", name: "Ana S." } },
-        { id: "def3", x: 80, y: 25, role: "defender", isOccupied: false },
-        // Mediocampos
-        { id: "mid1", x: 25, y: 50, role: "midfielder", isOccupied: true, player: { id: "3", name: "José M." } },
-        { id: "mid2", x: 50, y: 50, role: "midfielder", isOccupied: false },
-        { id: "mid3", x: 75, y: 50, role: "midfielder", isOccupied: true, player: { id: "4", name: "Laura K." } },
-        // Delanteros
-        { id: "fwd1", x: 35, y: 75, role: "forward", isOccupied: false },
-        { id: "fwd2", x: 65, y: 75, role: "forward", isOccupied: true, player: { id: "5", name: "David R." } },
-        // Suplentes
-        { id: "sub1", x: 10, y: 40, role: "defender", isOccupied: false },
-        { id: "sub2", x: 90, y: 40, role: "midfielder", isOccupied: false },
-        { id: "sub3", x: 50, y: 65, role: "forward", isOccupied: true, player: { id: "6", name: "Carmen L." } },
-        { id: "sub4", x: 15, y: 65, role: "midfielder", isOccupied: false },
-        { id: "sub5", x: 85, y: 65, role: "defender", isOccupied: true, player: { id: "7", name: "Roberto C." } },
-      ];
-    
-    case "futbol11":
-      return [
-        // Arquero
-        { id: "gk1", x: 50, y: 5, role: "goalkeeper", isOccupied: true, player: { id: "1", name: "Alejandro G." } },
-        // Defensas
-        { id: "def1", x: 15, y: 20, role: "defender", isOccupied: false },
-        { id: "def2", x: 35, y: 20, role: "defender", isOccupied: true, player: { id: "2", name: "María F." } },
-        { id: "def3", x: 65, y: 20, role: "defender", isOccupied: false },
-        { id: "def4", x: 85, y: 20, role: "defender", isOccupied: true, player: { id: "3", name: "Carlos V." } },
-        // Mediocampos
-        { id: "mid1", x: 20, y: 40, role: "midfielder", isOccupied: true, player: { id: "4", name: "Lucía P." } },
-        { id: "mid2", x: 40, y: 40, role: "midfielder", isOccupied: false },
-        { id: "mid3", x: 60, y: 40, role: "midfielder", isOccupied: true, player: { id: "5", name: "Fernando M." } },
-        { id: "mid4", x: 80, y: 40, role: "midfielder", isOccupied: false },
-        // Mediocampos ofensivos
-        { id: "amid1", x: 30, y: 60, role: "midfielder", isOccupied: true, player: { id: "6", name: "Isabella R." } },
-        { id: "amid2", x: 70, y: 60, role: "midfielder", isOccupied: false },
-        // Delanteros
-        { id: "fwd1", x: 25, y: 80, role: "forward", isOccupied: false },
-        { id: "fwd2", x: 50, y: 80, role: "forward", isOccupied: true, player: { id: "7", name: "Gabriel H." } },
-        { id: "fwd3", x: 75, y: 80, role: "forward", isOccupied: true, player: { id: "8", name: "Valentina S." } },
-        // Suplentes en el banco
-        { id: "sub1", x: 10, y: 55, role: "defender", isOccupied: false },
-        { id: "sub2", x: 90, y: 55, role: "midfielder", isOccupied: false },
-        { id: "sub3", x: 50, y: 30, role: "midfielder", isOccupied: true, player: { id: "9", name: "Diego A." } },
-        { id: "sub4", x: 10, y: 30, role: "defender", isOccupied: false },
-        { id: "sub5", x: 90, y: 30, role: "forward", isOccupied: true, player: { id: "10", name: "Camila T." } },
-        { id: "sub6", x: 50, y: 95, role: "forward", isOccupied: false },
-        { id: "sub7", x: 25, y: 25, role: "midfielder", isOccupied: false },
-        { id: "sub8", x: 75, y: 25, role: "defender", isOccupied: true, player: { id: "11", name: "Andrés K." } },
-        { id: "sub9", x: 15, y: 70, role: "midfielder", isOccupied: false },
-      ];
-    
-    default:
-      return [];
-  }
-};
-
-// Mock event data con posiciones
-const mockEvent: Event = {
-  id: "1",
-  hostId: "1",
-  host: {
-    id: "1",
-    email: "cancha@ejemplo.com",
-    fullName: "Cancha El Estadio",
-    phone: "+57 300 123 4567",
-    userType: "host",
-    isActive: true,
-    createdAt: "2025-01-01",
-    businessName: "Cancha El Estadio",
-    address: "Calle 72 #15-30, Barranquilla",
-    coordinates: { latitude: 10.9878, longitude: -74.7889 },
-    description: "La mejor cancha sintética de Barranquilla",
-    fields: [],
-    rating: 4.5,
-    totalReviews: 120,
-    businessHours: {},
-    contactInfo: {},
+const fieldConfig = {
+  futbol5: {
+    rows: [
+      ["ArqueroA"],
+      ["DefensaA1", "DefensaA2"],
+      ["MediocampoA1"],
+      ["DelanteroA1"],
+      [],
+      ["DelanteroB1"],
+      ["MediocampoB1"],
+      ["DefensaB1", "DefensaB2"],
+      ["ArqueroB"],
+    ],
   },
-  fieldId: "1",
-  field: {
-    id: "1",
-    name: "Cancha Principal",
-    type: "futbol7", // Cambiable para probar diferentes tipos
-    capacity: 14,
-    pricePerHour: 50000,
-    hasLighting: true,
-    isIndoor: false,
-    amenities: ["Baños", "Parqueadero", "Cafetería"],
-    images: [],
-    isActive: true,
+  futbol7: {
+    rows: [
+      ["ArqueroA"],
+      ["DefensaA1", "DefensaA2"],
+      ["MediocampoA1", "MediocampoA2"],
+      ["DelanteroA1"],
+      [],
+      ["DelanteroB1"],
+      ["MediocampoB1", "MediocampoB2"],
+      ["DefensaB1", "DefensaB2"],
+      ["ArqueroB"],
+    ],
   },
-  title: "Fútbol 7 - Viernes en la tarde",
-  description: "Partido amistoso, todos los niveles bienvenidos",
-  date: "2025-06-14",
-  startTime: "18:00",
-  endTime: "19:30",
-  duration: 90,
-  maxPlayers: 14,
-  currentPlayers: 8,
-  pricePerPlayer: 7000,
-  status: "open",
-  participants: [],
-  createdAt: "2025-06-14",
+  futbol11: {
+    rows: [
+      ["ArqueroA"],
+      ["DefensaA1", "DefensaA2", "DefensaA3", "DefensaA4"],
+      ["MediocampoA1", "MediocampoA2", "MediocampoA3"],
+      ["DelanteroA1", "DelanteroA2", "DelanteroA3"],
+      [],
+      ["DelanteroB1", "DelanteroB2", "DelanteroB3"],
+      ["MediocampoB1", "MediocampoB2", "MediocampoB3"],
+      ["DefensaB1", "DefensaB2", "DefensaB3", "DefensaB4"],
+      ["ArqueroB"],
+    ],
+  },
 };
 
 const JoinEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const { user } = useAuth();
   const { eventId } = route.params;
-  const [event, setEvent] = useState<Event | null>(null);
-  const [fieldPositions, setFieldPositions] = useState<FieldPosition[]>([]);
-  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+  const [event, setEvent] = useState<EventForFrontend | null>(null);
+  const [selectedPosition, setSelectedPosition] =
+    useState<EventPosition | null>(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [showFieldView, setShowFieldView] = useState(true);
 
   useEffect(() => {
@@ -197,97 +100,157 @@ const JoinEventScreen: React.FC<Props> = ({ navigation, route }) => {
   const loadEventDetails = async () => {
     try {
       setLoading(true);
-      // Simular carga de API
-      setTimeout(() => {
-        setEvent(mockEvent);
-        setFieldPositions(getFieldLayout(mockEvent.field.type));
-        setLoading(false);
-      }, 500);
+      const result = await playerEventService.getEventDetails(eventId);
+
+      if (result.success && result.data) {
+        setEvent(result.data);
+
+        const userPosition = result.data.positions.find(
+          (p) => p.jugadorId === user?.id
+        );
+        if (userPosition) {
+          Alert.alert(
+            "Ya estás inscrito",
+            `Ya tienes la posición: ${getPositionDisplayName(
+              userPosition.nombre
+            )}`,
+            [
+              {
+                text: "Ver evento",
+                onPress: () => navigation.navigate("EventDetails", { eventId }),
+              },
+              { text: "OK" },
+            ]
+          );
+        }
+      } else {
+        Alert.alert("Error", result.message);
+        navigation.goBack();
+      }
     } catch (error) {
       console.error("Error loading event details:", error);
+      Alert.alert("Error", "No se pudieron cargar los detalles del evento");
+      navigation.goBack();
+    } finally {
       setLoading(false);
     }
   };
 
-  const handlePositionSelect = (positionId: string) => {
-    const position = fieldPositions.find(p => p.id === positionId);
-    if (position && !position.isOccupied) {
-      setSelectedPosition(positionId);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadEventDetails();
+    setRefreshing(false);
+  };
+
+  const handlePositionSelect = (position: EventPosition) => {
+    if (!position.ocupada) {
+      setSelectedPosition(position);
+      console.log("🎯 Posición seleccionada:", position.nombre, position.id);
     }
   };
 
   const handleJoinEvent = async () => {
-    if (!selectedPosition || !event || !user) {
+    if (!selectedPosition || !event || !user?.id) {
       Alert.alert("Error", "Por favor selecciona una posición en la cancha.");
       return;
     }
 
-    try {
-      setJoining(true);
+    Alert.alert(
+      "Confirmar inscripción",
+      `¿Confirmas tu inscripción en la posición ${getPositionDisplayName(
+        selectedPosition.nombre
+      )}?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Confirmar",
+          onPress: async () => {
+            try {
+              setJoining(true);
 
-      // Simular unirse al evento
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+              const result = await playerEventService.joinEvent(
+                event.id,
+                selectedPosition.id,
+                user.id
+              );
 
-      // Actualizar la posición como ocupada
-      setFieldPositions(prev => 
-        prev.map(pos => 
-          pos.id === selectedPosition 
-            ? { ...pos, isOccupied: true, player: { id: user.id || "", name: user.fullName } }
-            : pos
-        )
-      );
-
-      Alert.alert(
-        "¡Te has unido al partido! ⚽",
-        `Has sido registrado en la posición seleccionada. Te enviaremos recordatorios antes del partido.`,
-        [
-          {
-            text: "Ver evento",
-            onPress: () => navigation.navigate("EventDetails", { eventId: event.id }),
+              if (result.success) {
+                Alert.alert(
+                  "¡Te has unido al partido! ⚽",
+                  `Has sido registrado en la posición: ${getPositionDisplayName(
+                    selectedPosition.nombre
+                  )}\n\nTe enviaremos recordatorios antes del partido.`,
+                  [
+                    {
+                      text: "Ver evento",
+                      onPress: () =>
+                        navigation.navigate("EventDetails", {
+                          eventId: event.id,
+                        }),
+                    },
+                    {
+                      text: "Ir al inicio",
+                      onPress: () => navigation.navigate("MapView"),
+                    },
+                  ]
+                );
+              } else {
+                Alert.alert("Error", result.message);
+                await loadEventDetails();
+              }
+            } catch (error) {
+              console.error("❌ Error joining event:", error);
+              Alert.alert(
+                "Error",
+                "No pudimos unirte al partido. Intenta nuevamente.",
+                [{ text: "OK" }]
+              );
+            } finally {
+              setJoining(false);
+            }
           },
-          {
-            text: "Ir al inicio",
-            onPress: () => navigation.navigate("MapView"),
-          },
-        ]
-      );
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        "No pudimos unirte al partido. Intenta nuevamente.",
-        [{ text: "OK" }]
-      );
-    } finally {
-      setJoining(false);
+        },
+      ]
+    );
+  };
+
+  const getPositionDisplayName = (positionName: string): string => {
+    const type = getPositionType(positionName);
+    const teamLetter = positionName.includes("A") ? "A" : "B";
+    const number = positionName.match(/\d+/)?.[0] || "";
+
+    return `${type} ${teamLetter}${number ? number : ""}`;
+  };
+
+  const getPositionColor = (positionName: string): string => {
+    const type = getPositionType(positionName);
+    switch (type) {
+      case "Arquero":
+        return "#FF9800";
+      case "Defensa":
+        return "#2196F3";
+      case "Mediocampo":
+        return "#4CAF50";
+      case "Delantero":
+        return "#F44336";
+      default:
+        return Colors.primary;
     }
   };
 
-  const getPositionColor = (role: PlayerPosition): string => {
-    switch (role) {
-      case "goalkeeper": return "#FF9800";
-      case "defender": return "#2196F3";
-      case "midfielder": return "#4CAF50";
-      case "forward": return "#F44336";
-      default: return Colors.primary;
-    }
-  };
-
-  const getPositionIcon = (role: PlayerPosition): string => {
-    switch (role) {
-      case "goalkeeper": return "🥅";
-      case "defender": return "🛡️";
-      case "midfielder": return "⚡";
-      case "forward": return "⚽";
-      default: return "👤";
-    }
-  };
-
-  const getFieldDimensions = (fieldType: FieldType) => {
-    switch (fieldType) {
-      case "futbol5": return { width: 280, height: 180 };
-      case "futbol7": return { width: 320, height: 200 };
-      case "futbol11": return { width: 360, height: 240 };
-      default: return { width: 320, height: 200 };
+  const getPositionIcon = (positionName: string): string => {
+    const type = getPositionType(positionName);
+    switch (type) {
+      case "Arquero":
+        return "🥅";
+      case "Defensa":
+        return "🛡️";
+      case "Mediocampo":
+        return "⚡";
+      case "Delantero":
+        return "⚽";
+      default:
+        return "👤";
     }
   };
 
@@ -296,105 +259,162 @@ const JoinEventScreen: React.FC<Props> = ({ navigation, route }) => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
         <View style={styles.loadingContainer}>
-          <Text>Cargando evento...</Text>
+          <Text style={styles.loadingText}>Cargando evento...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const fieldDimensions = getFieldDimensions(event.field.type);
-  const availablePositions = fieldPositions.filter(p => !p.isOccupied);
-  const occupiedPositions = fieldPositions.filter(p => p.isOccupied);
+  const availablePositions = event.positions.filter((p) => !p.ocupada);
+  const occupiedPositions = event.positions.filter((p) => p.ocupada);
+  const userPosition = event.positions.find((p) => p.jugadorId === user?.id);
+  const isUserJoined = !!userPosition;
 
-  const FieldVisualizer = () => (
-    <View style={styles.fieldContainer}>
-      <Text style={styles.fieldTitle}>
-        {getPositionIcon(event.field.type as any)} Cancha {event.field.type.replace("futbol", "Fútbol ")}
-      </Text>
-      
-      <View style={[styles.field, { width: fieldDimensions.width, height: fieldDimensions.height }]}>
-        {/* Líneas de la cancha */}
-        <View style={styles.fieldLines}>
-          {/* Área grande */}
-          <View style={[styles.goalArea, styles.goalAreaTop]} />
-          <View style={[styles.goalArea, styles.goalAreaBottom]} />
-          
-          {/* Círculo central */}
-          <View style={styles.centerCircle} />
-          
-          {/* Línea central */}
-          <View style={styles.centerLine} />
-          
-          {/* Arcos */}
-          <View style={[styles.goal, styles.goalTop]} />
-          <View style={[styles.goal, styles.goalBottom]} />
-        </View>
+  const renderSoccerField = () => {
+    const config =
+      fieldConfig[event.fieldType as keyof typeof fieldConfig] ||
+      fieldConfig.futbol7;
 
-        {/* Posiciones de jugadores */}
-        {fieldPositions.map((position) => (
-          <TouchableOpacity
-            key={position.id}
-            style={[
-              styles.playerPosition,
-              {
-                left: `${position.x}%`,
-                top: `${position.y}%`,
-                backgroundColor: position.isOccupied 
-                  ? getPositionColor(position.role)
-                  : selectedPosition === position.id 
-                    ? Colors.primary 
-                    : 'rgba(255, 255, 255, 0.8)',
-                borderColor: getPositionColor(position.role),
-                borderWidth: selectedPosition === position.id ? 3 : 1.5,
-                opacity: position.isOccupied ? 0.9 : selectedPosition === position.id ? 1 : 0.7,
-              }
-            ]}
-            onPress={() => handlePositionSelect(position.id)}
-            disabled={position.isOccupied}
-            activeOpacity={0.8}
-          >
-            {position.isOccupied ? (
-              <View style={styles.occupiedPosition}>
-                <Text style={styles.playerInitial}>
-                  {position.player?.name.charAt(0).toUpperCase()}
-                </Text>
+    return (
+      <View style={styles.fieldContainer}>
+        <Text style={styles.fieldTitle}>
+          {getPositionIcon(event.fieldType)} Cancha{" "}
+          {event.fieldType.replace("futbol", "Fútbol ")}
+        </Text>
+
+        <View style={[styles.field, { width: width - 60 }]}>
+          <View style={styles.fieldLines}>
+            <View style={[styles.goalArea, styles.goalAreaTop]} />
+            <View style={[styles.goalArea, styles.goalAreaBottom]} />
+            <View style={styles.centerCircle} />
+            <View style={styles.centerLine} />
+            <View style={[styles.goal, styles.goalTop]} />
+            <View style={[styles.goal, styles.goalBottom]} />
+          </View>
+
+          <View style={styles.fieldPositionsImproved}>
+            {config.rows.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.fieldRowImproved}>
+                {row.length === 0 ? (
+                  <View style={styles.emptyRowImproved}>
+                    <View style={styles.centerLineLabel}>
+                      <Text style={styles.centerLineText}>CENTRO</Text>
+                    </View>
+                  </View>
+                ) : (
+                  row.map((positionPattern) => {
+                    const position = event.positions.find((p) =>
+                      p.nombre.includes(positionPattern)
+                    );
+                    if (!position) return null;
+
+                    const positionType = getPositionType(position.nombre);
+                    const isGoalkeeper = positionType === "Arquero";
+                    const isSelected = selectedPosition?.id === position.id;
+
+                    return (
+                      <TouchableOpacity
+                        key={position.id}
+                        style={[
+                          styles.soccerPositionImproved,
+                          position.ocupada && styles.soccerPositionOccupied,
+                          isGoalkeeper && styles.goalkeeperPosition,
+                          isSelected && styles.selectedPosition,
+                        ]}
+                        onPress={() => handlePositionSelect(position)}
+                        disabled={position.ocupada || isUserJoined}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.positionIcon}>
+                          <Ionicons
+                            name={
+                              position.ocupada
+                                ? "person"
+                                : isSelected
+                                ? "checkmark"
+                                : "add"
+                            }
+                            size={12} // Tamaño de ícono ajustado
+                            color={
+                              position.ocupada || isGoalkeeper || isSelected
+                                ? "white"
+                                : "#666"
+                            }
+                          />
+                        </View>
+                        <Text
+                          style={[
+                            styles.soccerPositionName,
+                            (isGoalkeeper || position.ocupada || isSelected) &&
+                              styles.soccerPositionNameWhite,
+                          ]}
+                        >
+                          {positionType.slice(0, 4).toUpperCase()}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.soccerPositionPlayer,
+                            (isGoalkeeper || position.ocupada || isSelected) &&
+                              styles.soccerPositionPlayerWhite,
+                          ]}
+                        >
+                          {position.nombreJugador?.slice(0, 5) || "Libre"}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
               </View>
-            ) : (
-              <Ionicons 
-                name={selectedPosition === position.id ? "checkmark" : "add"} 
-                size={selectedPosition === position.id ? 16 : 12} 
-                color={selectedPosition === position.id ? "white" : getPositionColor(position.role)} 
-              />
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
+            ))}
+          </View>
+        </View>
 
-      {/* Leyenda */}
-      <View style={styles.legend}>
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendIcon, { backgroundColor: "#FF9800" }]} />
-            <Text style={styles.legendText}>Arquero</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendIcon, { backgroundColor: "#2196F3" }]} />
-            <Text style={styles.legendText}>Defensa</Text>
-          </View>
-        </View>
-        <View style={styles.legendRow}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendIcon, { backgroundColor: "#4CAF50" }]} />
-            <Text style={styles.legendText}>Mediocampo</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendIcon, { backgroundColor: "#F44336" }]} />
-            <Text style={styles.legendText}>Delantero</Text>
+        <View style={styles.fieldLegendImproved}>
+          <Text style={styles.legendTitle}>Leyenda:</Text>
+          <View style={styles.legendItems}>
+            <View style={styles.legendItem}>
+              <View
+                style={[
+                  styles.legendColor,
+                  { backgroundColor: Colors.primaryLight },
+                ]}
+              />
+              <Text style={styles.legendText}>Ocupado</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View
+                style={[
+                  styles.legendColor,
+                  { backgroundColor: "rgba(255,255,255,0.3)" },
+                ]}
+              />
+              <Text style={styles.legendText}>Disponible</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View
+                style={[
+                  styles.legendColor,
+                  { backgroundColor: Colors.warning },
+                ]}
+              />
+              <Text style={styles.legendText}>Arquero</Text>
+            </View>
+            {selectedPosition && (
+              <View style={styles.legendItem}>
+                <View
+                  style={[
+                    styles.legendColor,
+                    { backgroundColor: Colors.primary },
+                  ]}
+                />
+                <Text style={styles.legendText}>Seleccionado</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -416,97 +436,168 @@ const JoinEventScreen: React.FC<Props> = ({ navigation, route }) => {
             <Ionicons name="arrow-back" size={24} color={Colors.textLight} />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Unirse al partido</Text>
-          
+          <Text style={styles.headerTitle}>
+            {isUserJoined ? "Tu posición" : "Unirse al partido"}
+          </Text>
+
           <TouchableOpacity
             style={styles.viewToggle}
             onPress={() => setShowFieldView(!showFieldView)}
             activeOpacity={0.7}
           >
-            <Ionicons 
-              name={showFieldView ? "list" : "football"} 
-              size={20} 
-              color={Colors.textLight} 
+            <Ionicons
+              name={showFieldView ? "list" : "football"}
+              size={20}
+              color={Colors.textLight}
             />
           </TouchableOpacity>
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Event Summary */}
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+      >
         <View style={styles.eventSummary}>
           <View style={styles.eventInfo}>
             <Text style={styles.eventTitle}>{event.title}</Text>
-            <Text style={styles.eventHost}>{event.host.businessName}</Text>
+            <Text style={styles.eventHost}>
+              {event.fieldInfo?.businessName || event.fieldName}
+            </Text>
 
             <View style={styles.eventMeta}>
               <View style={styles.metaItem}>
-                <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
-                <Text style={styles.metaText}>Viernes 14 Jun</Text>
+                <Ionicons
+                  name="calendar-outline"
+                  size={16}
+                  color={Colors.primary}
+                />
+                <Text style={styles.metaText}>
+                  {new Date(event.date).toLocaleDateString("es-ES", {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </Text>
               </View>
               <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={16} color={Colors.primary} />
-                <Text style={styles.metaText}>{event.startTime} - {event.endTime}</Text>
+                <Ionicons
+                  name="time-outline"
+                  size={16}
+                  color={Colors.primary}
+                />
+                <Text style={styles.metaText}>{event.time}</Text>
               </View>
               <View style={styles.metaItem}>
-                <Ionicons name="cash-outline" size={16} color={Colors.primary} />
-                <Text style={styles.metaText}>${event.pricePerPlayer.toLocaleString()}</Text>
+                <Ionicons
+                  name="cash-outline"
+                  size={16}
+                  color={Colors.primary}
+                />
+                <Text style={styles.metaText}>
+                  ${event.fieldInfo?.pricePerPlayer?.toLocaleString() || "N/A"}
+                </Text>
               </View>
             </View>
           </View>
 
           <View style={styles.playersIndicator}>
-            <Text style={styles.playersCount}>{occupiedPositions.length}/{event.maxPlayers}</Text>
+            <Text style={styles.playersCount}>
+              {occupiedPositions.length}/{event.maxPlayers}
+            </Text>
             <Text style={styles.playersLabel}>Jugadores</Text>
           </View>
         </View>
 
-        {/* Field Visualizer */}
+        {isUserJoined && userPosition && (
+          <View style={styles.userStatusCard}>
+            <View style={styles.userStatusHeader}>
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={Colors.success}
+              />
+              <Text style={styles.userStatusTitle}>Ya estás inscrito</Text>
+            </View>
+            <Text style={styles.userStatusPosition}>
+              Tu posición: {getPositionDisplayName(userPosition.nombre)}
+            </Text>
+            <Text style={styles.userStatusEmoji}>
+              {getPositionIcon(userPosition.nombre)}
+            </Text>
+          </View>
+        )}
+
         {showFieldView ? (
           <View style={styles.fieldSection}>
-            <Text style={styles.sectionTitle}>Selecciona tu posición</Text>
-            <Text style={styles.sectionSubtitle}>
-              Toca una posición libre para unirte al partido
+            <Text style={styles.sectionTitle}>
+              {isUserJoined
+                ? "Tu posición en el campo"
+                : "Selecciona tu posición"}
             </Text>
-            
-            <FieldVisualizer />
+            {!isUserJoined && (
+              <Text style={styles.sectionSubtitle}>
+                Toca una posición libre para unirte al partido
+              </Text>
+            )}
 
-            {selectedPosition && (
+            {renderSoccerField()}
+
+            {selectedPosition && !isUserJoined && (
               <View style={styles.selectedPositionInfo}>
-                <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color={Colors.success}
+                />
                 <Text style={styles.selectedPositionText}>
-                  Posición seleccionada: {
-                    fieldPositions.find(p => p.id === selectedPosition)?.role === "goalkeeper" ? "Arquero" :
-                    fieldPositions.find(p => p.id === selectedPosition)?.role === "defender" ? "Defensa" :
-                    fieldPositions.find(p => p.id === selectedPosition)?.role === "midfielder" ? "Mediocampo" :
-                    "Delantero"
-                  }
+                  Posición seleccionada:{" "}
+                  {getPositionDisplayName(selectedPosition.nombre)}
                 </Text>
               </View>
             )}
           </View>
         ) : (
-          /* Lista de jugadores */
           <View style={styles.playersSection}>
             <Text style={styles.sectionTitle}>Jugadores confirmados</Text>
-            
+
             <View style={styles.playersList}>
               {occupiedPositions.map((position) => (
                 <View key={position.id} style={styles.playerItem}>
-                  <View style={[styles.playerAvatar, { backgroundColor: getPositionColor(position.role) }]}>
+                  <View
+                    style={[
+                      styles.playerAvatar,
+                      { backgroundColor: getPositionColor(position.nombre) },
+                    ]}
+                  >
                     <Text style={styles.playerInitial}>
-                      {position.player?.name.charAt(0).toUpperCase()}
+                      {position.nombreJugador?.charAt(0).toUpperCase() || "?"}
                     </Text>
                   </View>
                   <View style={styles.playerInfo}>
-                    <Text style={styles.playerName}>{position.player?.name}</Text>
+                    <Text style={styles.playerName}>
+                      {position.nombreJugador || "Jugador"}
+                    </Text>
                     <Text style={styles.playerRole}>
-                      {position.role === "goalkeeper" ? "Arquero" :
-                       position.role === "defender" ? "Defensa" :
-                       position.role === "midfielder" ? "Mediocampo" : "Delantero"}
+                      {getPositionDisplayName(position.nombre)}
                     </Text>
                   </View>
-                  <Text style={styles.positionEmoji}>{getPositionIcon(position.role)}</Text>
+                  <Text style={styles.positionEmoji}>
+                    {getPositionIcon(position.nombre)}
+                  </Text>
+                  {position.jugadorId === user?.id && (
+                    <View style={styles.youBadge}>
+                      <Text style={styles.youText}>Tú</Text>
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
@@ -516,48 +607,83 @@ const JoinEventScreen: React.FC<Props> = ({ navigation, route }) => {
                 {availablePositions.length} posiciones disponibles
               </Text>
               <Text style={styles.availableText}>
-                Cambia a vista de cancha para seleccionar tu posición
+                {isUserJoined
+                  ? "Ya tienes una posición asignada"
+                  : "Cambia a vista de cancha para seleccionar tu posición"}
               </Text>
             </View>
           </View>
         )}
 
-        {/* Payment Info */}
-        <View style={styles.paymentInfo}>
-          <Text style={styles.sectionTitle}>Información de pago</Text>
+        {!isUserJoined && (
+          <View style={styles.paymentInfo}>
+            <Text style={styles.sectionTitle}>Información de pago</Text>
 
-          <View style={styles.paymentCard}>
-            <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Costo por jugador:</Text>
-              <Text style={styles.paymentValue}>${event.pricePerPlayer.toLocaleString()}</Text>
-            </View>
+            <View style={styles.paymentCard}>
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Costo por jugador:</Text>
+                <Text style={styles.paymentValue}>
+                  ${event.fieldInfo?.pricePerPlayer?.toLocaleString() || "N/A"}
+                </Text>
+              </View>
 
-            <View style={styles.paymentNote}>
-              <Ionicons name="information-circle-outline" size={16} color={Colors.info} />
-              <Text style={styles.paymentNoteText}>
-                El pago se realiza en efectivo directamente en la cancha
-              </Text>
+              <View style={styles.paymentNote}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={16}
+                  color={Colors.info}
+                />
+                <Text style={styles.paymentNoteText}>
+                  El pago se realiza en efectivo directamente en la cancha
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
       </ScrollView>
 
-      {/* Join Button */}
-      <View style={styles.joinContainer}>
-        <CustomButton
-          title={joining ? "Uniéndote..." : selectedPosition ? "Confirmar posición y unirse" : "Selecciona una posición"}
-          onPress={handleJoinEvent}
-          loading={joining}
-          disabled={!selectedPosition || joining}
-          fullWidth
-          icon="checkmark-circle"
-          style={[styles.joinButton, !selectedPosition && styles.joinButtonDisabled]}
-        />
+      {!isUserJoined && (
+        <View style={styles.joinContainer}>
+          <CustomButton
+            title={
+              joining
+                ? "Uniéndote..."
+                : selectedPosition
+                ? "Confirmar posición y unirse"
+                : "Selecciona una posición"
+            }
+            onPress={handleJoinEvent}
+            loading={joining}
+            disabled={
+              !selectedPosition || joining || availablePositions.length === 0
+            }
+            fullWidth
+            icon="checkmark-circle"
+            style={[
+              styles.joinButton,
+              !selectedPosition && styles.joinButtonDisabled,
+            ]}
+          />
 
-        <Text style={styles.disclaimer}>
-          Al unirte aceptas los términos de uso y las políticas de cancelación
-        </Text>
-      </View>
+          <Text style={styles.disclaimer}>
+            Al unirte aceptas los términos de uso y las políticas de cancelación
+          </Text>
+        </View>
+      )}
+
+      {isUserJoined && (
+        <View style={styles.joinContainer}>
+          <CustomButton
+            title="Ver detalles del evento"
+            onPress={() =>
+              navigation.navigate("EventDetails", { eventId: event.id })
+            }
+            fullWidth
+            icon="eye-outline"
+            style={styles.viewEventButton}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -571,6 +697,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
   },
   header: {
     paddingTop: 50,
@@ -659,6 +789,35 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     marginTop: 2,
   },
+  userStatusCard: {
+    backgroundColor: Colors.surface,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: Colors.success,
+    alignItems: "center",
+  },
+  userStatusHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  userStatusTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: Colors.success,
+  },
+  userStatusPosition: {
+    fontSize: 16,
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  userStatusEmoji: {
+    fontSize: 32,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
@@ -675,11 +834,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 24,
   },
+
   fieldContainer: {
     alignItems: "center",
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 20,
+    padding: 15,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -693,7 +853,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
     borderRadius: 12,
     position: "relative",
-    marginBottom: 16,
     borderWidth: 3,
     borderColor: "white",
   },
@@ -707,9 +866,9 @@ const styles = StyleSheet.create({
   goalArea: {
     position: "absolute",
     width: "40%",
-    height: "15%",
+    height: "12%",
     borderWidth: 2,
-    borderColor: "white",
+    borderColor: "rgba(255,255,255,0.7)",
     left: "30%",
   },
   goalAreaTop: {
@@ -722,87 +881,166 @@ const styles = StyleSheet.create({
   },
   centerCircle: {
     position: "absolute",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     borderWidth: 2,
-    borderColor: "white",
+    borderColor: "rgba(255,255,255,0.7)",
     top: "50%",
     left: "50%",
-    marginTop: -30,
-    marginLeft: -30,
+    marginTop: -35,
+    marginLeft: -35,
   },
   centerLine: {
     position: "absolute",
     width: "100%",
     height: 2,
-    backgroundColor: "white",
+    backgroundColor: "rgba(255,255,255,0.7)",
     top: "50%",
     marginTop: -1,
   },
   goal: {
     position: "absolute",
-    width: "20%",
-    height: 8,
+    width: "25%",
+    height: 6,
     backgroundColor: "white",
-    left: "40%",
-    borderRadius: 4,
+    left: "37.5%",
+    borderRadius: 3,
   },
   goalTop: {
-    top: -4,
+    top: -3,
   },
   goalBottom: {
-    bottom: -4,
+    bottom: -3,
   },
-  playerPosition: {
-    position: "absolute",
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: -16,
-    marginTop: -16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+
+  fieldPositionsImproved: {
+    flex: 1,
+    justifyContent: "space-around",
+    paddingVertical: 20,
+    paddingHorizontal: 5,
+    zIndex: 2,
   },
-  occupiedPosition: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  playerInitial: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "white",
-  },
-  legend: {
-    width: "100%",
-    gap: 8,
-  },
-  legendRow: {
+
+  fieldRowImproved: {
     flexDirection: "row",
     justifyContent: "space-around",
+    alignItems: "center",
+    marginVertical: 6,
+  },
+
+  emptyRowImproved: {
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 6,
+  },
+
+  centerLineLabel: {
+    backgroundColor: "rgba(255,255,255,0.8)",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+
+  centerLineText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "#2E7D32",
+  },
+
+  soccerPositionImproved: {
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 10,
+    padding: 6,
+    minWidth: 68,
+    minHeight: 68,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+    marginHorizontal: 2,
+  },
+  soccerPositionOccupied: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  goalkeeperPosition: {
+    backgroundColor: Colors.warning,
+    borderColor: "#FFB300",
+  },
+  selectedPosition: {
+    backgroundColor: Colors.primary,
+    borderColor: "white",
+    transform: [{ scale: 1.05 }],
+    elevation: 6,
+  },
+  positionIcon: {
+    marginBottom: 4,
+  },
+  soccerPositionName: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: Colors.textPrimary,
+    marginBottom: 2,
+    textAlign: "center",
+  },
+  soccerPositionPlayer: {
+    fontSize: 9,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  soccerPositionNameWhite: {
+    color: "white",
+  },
+  soccerPositionPlayerWhite: {
+    color: "rgba(255, 255, 255, 0.9)",
+  },
+
+  fieldLegendImproved: {
+    backgroundColor: "rgba(0,0,0,0.1)",
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 16,
+    width: "100%",
+  },
+  legendTitle: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: Colors.textPrimary,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  legendItems: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 12,
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
   },
-  legendIcon: {
+  legendColor: {
     width: 12,
     height: 12,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.2)",
   },
   legendText: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.textSecondary,
+    fontWeight: "500",
   },
+
   selectedPositionInfo: {
     flexDirection: "row",
     alignItems: "center",
@@ -844,6 +1082,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
+  playerInitial: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "white",
+  },
   playerInfo: {
     flex: 1,
   },
@@ -858,6 +1101,18 @@ const styles = StyleSheet.create({
   },
   positionEmoji: {
     fontSize: 20,
+    marginRight: 8,
+  },
+  youBadge: {
+    backgroundColor: Colors.success,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  youText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "white",
   },
   availablePositions: {
     backgroundColor: Colors.primaryLight,
@@ -933,6 +1188,9 @@ const styles = StyleSheet.create({
   },
   joinButtonDisabled: {
     opacity: 0.6,
+  },
+  viewEventButton: {
+    backgroundColor: Colors.secondary,
   },
   disclaimer: {
     fontSize: 12,

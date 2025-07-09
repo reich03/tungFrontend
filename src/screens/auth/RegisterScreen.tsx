@@ -15,7 +15,6 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import { AuthStackParamList } from "../../types";
 
-// Colores mejorados con más vibración
 const BrandColors = {
   primaryGreen: "#30CE26",
   limeGreen: "#B3FE02",
@@ -43,7 +42,6 @@ interface Props {
 const { width, height } = Dimensions.get("window");
 
 const RegisterScreen: React.FC<Props> = ({ navigation }) => {
-  // Animaciones
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim1 = useRef(new Animated.Value(0.8)).current;
@@ -117,7 +115,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         backgroundColor={BrandColors.background}
       />
 
-      {/* Header mejorado */}
       <Animated.View
         style={[
           styles.header,
@@ -140,7 +137,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section mejorado */}
         <Animated.View
           style={[
             styles.heroSection,
@@ -165,7 +161,6 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             grande
           </Text>
 
-          {/* Decorative elements */}
           <View style={styles.decorativeElements}>
             <View
               style={[
@@ -190,9 +185,7 @@ const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Animated.View>
 
-        {/* Opciones mejoradas */}
         <View style={styles.optionsContainer}>
-          {/* Opción Jugador mejorada */}
           <Animated.View
             style={[
               styles.optionWrapper,
@@ -481,7 +474,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Hero Section
   heroSection: {
     alignItems: "center",
     marginBottom: 40,
@@ -554,8 +546,6 @@ const styles = StyleSheet.create({
     left: width * 0.3,
     top: undefined,
   },
-
-  // Options
   optionsContainer: {
     gap: 24,
     marginBottom: 40,
